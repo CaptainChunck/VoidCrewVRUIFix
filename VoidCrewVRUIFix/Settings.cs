@@ -59,6 +59,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> FixIntroVideo;
         public static ConfigEntry<bool> KeepTerminalScreensInWorld;
         public static ConfigEntry<bool> SnapUiToTerminalScreens;
+        public static ConfigEntry<bool> HideTurretScreenBorder;
         public static ConfigEntry<bool> DisableDlss;
         public static ConfigEntry<bool> DisableFsr3;
         public static ConfigEntry<bool> DisableUuvrUi;
@@ -154,6 +155,9 @@ namespace VoidCrewVRUIFix
             SnapUiToTerminalScreens = config.Bind("Fixes", "UI On Terminal Screens", true,
                 "While you use a terminal, the VR UI panel (mouse pointer and button hints) moves onto the terminal's screen, at its distance and size, " +
                 "so the pointer sits on the screen itself. Only when the UI panel stays in front of the game camera (not when it follows your head).");
+            HideTurretScreenBorder = config.Bind("Fixes", "Hide Turret Screen Border", true,
+                "Hides the dark border the game fades in along the screen edges while you control a turret (black bars when you zoom in). " +
+                "On a monitor it frames the picture; in VR it showed as a dark box around the UI.");
             DisableDlss = config.Bind("Fixes", "Disable DLSS", true,
                 "Removes DLSS from the graphics options while UUVR is installed. Set to false to try DLSS in VR (experimental): " +
                 "restart the game, then pick DLSS under Graphics > Upscaling. DLSS then only runs on the player camera.");

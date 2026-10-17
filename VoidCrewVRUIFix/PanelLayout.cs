@@ -30,7 +30,12 @@ namespace VoidCrewVRUIFix
 
         public static float HeightOffset
         {
-            get { return _onTerminal ? _terminalHeightOffset : Settings.PanelHeightOffset.Value; }
+            get
+            {
+                if (_onTerminal) return _terminalHeightOffset;
+                // A turret shoots along the game camera's centre line, so its crosshair (the middle of the panel) goes there.
+                return HeadAim.InVehicleView ? 0f : Settings.PanelHeightOffset.Value;
+            }
         }
 
         /// <summary>
@@ -73,7 +78,8 @@ namespace VoidCrewVRUIFix
         public static string Describe()
         {
             return string.Format("{0:0}° wide ({1:0.00} x {2:0.00} m) at {3:0.0} m, anchor {4}, height offset {5:0.00} m{6}",
-                WidthDegrees, WidthMeters, HeightMeters, Distance, Settings.Anchor.Value, HeightOffset, _onTerminal ? ", on a terminal screen" : "");
+                WidthDegrees, WidthMeters, HeightMeters, Distance, Settings.Anchor.Value, HeightOffset,
+                _onTerminal ? ", on a terminal screen" : HeadAim.InVehicleView ? ", centred on the turret or ship camera" : "");
         }
     }
 

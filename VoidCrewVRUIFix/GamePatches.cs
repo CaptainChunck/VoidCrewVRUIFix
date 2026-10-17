@@ -38,6 +38,7 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "CG.Client.Ship.Modules.Mediators.TerminalModuleMediator", "DelayedParentWorldUiPanel", nameof(ShipTerminalEntered), null,
                 "ship terminal screens", applied, skipped);
             Patch(harmony, "CG.Client.UI.Terminals.WorldSpaceUI", "TransformPointerEvent", nameof(TerminalScreenPointer), null, "terminal screen clicks", applied, skipped);
+            Patch(harmony, "CG.Client.Player.HUD.WeaponControlScreenBorder", "PlaySequence", nameof(HideTurretBorder), null, "turret screen border", applied, skipped);
             Patch(harmony, "Opsive.UltimateCharacterController.FirstPersonController.Camera.ViewTypes.FirstPerson", "GetCrosshairsDeltaRotation", null,
                 nameof(AimWhereYouLook), "head aim (weapons)", applied, skipped);
             PatchLookWithHead(harmony, "CG.Client.Player.Interactions.RaycastHandler", "FindInteractable", "head aim (interactions)", applied, skipped);
@@ -316,6 +317,16 @@ namespace VoidCrewVRUIFix
                 Log.Failure("Mapping the mouse onto a terminal screen", e);
                 return true;
             }
+        }
+
+        // The turret screen's border is soft black bars along all four screen edges, which the game fades to 25% (fully
+        // black while zoomed in). Around the floating VR UI screen they showed as a dark box, so in VR it fades to nothing.
+        private static void HideTurretBorder(ref float alpha, CanvasGroup ___canvasGroup)
+        {
+            if (!XrState.IsActive || !Settings.HideTurretScreenBorder.Value) return;
+            alpha = 0f;
+            if (___canvasGroup != null) ___canvasGroup.alpha = 0f;
+            Log.InfoOnce("turret-border", "The turret screen's dark border is hidden in VR (it showed as a dark box around the UI).");
         }
 
         private static void RedirectIntroVideo(MonoBehaviour __instance)

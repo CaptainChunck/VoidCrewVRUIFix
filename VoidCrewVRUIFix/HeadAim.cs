@@ -10,6 +10,8 @@ namespace VoidCrewVRUIFix
     /// or terminal open) and "Aim With Your Head" is on, the UI screen follows your head, so the crosshair is in the
     /// middle of your view, and weapons, tools and interactions aim along the line from your eyes through it.
     /// Your body still turns with the mouse only.
+    /// In a turret (and the ship's outside cameras) the mouse aims the turret, which shoots along the game camera's centre
+    /// line, so there the UI screen stays in front of the game camera with the crosshair on that line.
     /// </summary>
     internal static class HeadAim
     {
@@ -25,17 +27,32 @@ namespace VoidCrewVRUIFix
         /// <summary>True while weapons, tools and interactions aim where you look.</summary>
         public static bool Aiming { get; private set; }
 
+        /// <summary>
+        /// True while the player controls a turret or looks through the ship's outside cameras. The crosshair then
+        /// shows where the turret or ship aims: the UI screen stays in front of the game camera, centred on its line.
+        /// </summary>
+        public static bool InVehicleView { get; private set; }
+
         /// <summary>Once per frame: whether the player is playing (no menu or terminal) decides both.</summary>
         public static void Update(bool vrActive, bool menuOpen)
         {
-            Aiming = vrActive && Settings.AimWithHead.Value && !menuOpen && !PanelLayout.OnTerminalScreen;
-            PanelFollowsHead = vrActive && (Settings.Anchor.Value == PanelAnchor.Head || Aiming);
+            bool vehicle = vrActive && PlayerModes.InVehicleView();
+            if (vehicle != InVehicleView)
+            {
+                InVehicleView = vehicle;
+                Log.Verbose(vehicle
+                    ? "Turret or ship camera view: the UI screen stays in front of the game camera, crosshair on its centre line."
+                    : "Left the turret or ship camera view.");
+            }
+            Aiming = vrActive && Settings.AimWithHead.Value && !menuOpen && !PanelLayout.OnTerminalScreen && !InVehicleView;
+            PanelFollowsHead = vrActive && !InVehicleView && (Settings.Anchor.Value == PanelAnchor.Head || Aiming);
         }
 
         public static void Stop()
         {
             Aiming = false;
             PanelFollowsHead = false;
+            InVehicleView = false;
         }
 
         /// <summary>
