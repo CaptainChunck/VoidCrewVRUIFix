@@ -16,6 +16,13 @@ namespace VoidCrewVRUIFix
         Head
     }
 
+    internal enum DesktopViewMode
+    {
+        PanelView,
+        HeadsetMirror,
+        UiOnly
+    }
+
     /// <summary>
     /// All user-facing options. The file is created automatically at
     /// BepInEx/config/com.user.voidcrew.vruifix.cfg the first time the game runs with the plugin.
@@ -44,7 +51,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> DisableFsr3;
         public static ConfigEntry<bool> DisableUuvrUi;
         public static ConfigEntry<bool> DisableUuvrHelperCameras;
-        public static ConfigEntry<bool> ShowVrViewOnDesktop;
+        public static ConfigEntry<DesktopViewMode> DesktopView;
         public static ConfigEntry<bool> ClearDesktopEachFrame;
 
         public static ConfigEntry<Key> KeyFlip;
@@ -54,6 +61,9 @@ namespace VoidCrewVRUIFix
 
         public static ConfigEntry<bool> SubmitOverlayOnRenderThread;
         public static ConfigEntry<bool> VerboseLogging;
+        private static ConfigEntry<int> _settingsVersion;
+
+        private const int CurrentSettingsVersion = 2;
 
         public static void Bind(ConfigFile config)
         {
@@ -78,8 +88,8 @@ namespace VoidCrewVRUIFix
             Anchor = config.Bind("UI Panel", "Anchor", PanelAnchor.GameCamera,
                 "GameCamera: the panel stays in front of the in-game view direction, so you can look around it and markers line up with the world.\n" +
                 "Head: the panel is locked to your head and always stays in front of your eyes.");
-            MenuBackdropOpacity = config.Bind("UI Panel", "Menu Backdrop Opacity", 0.5f,
-                new ConfigDescription("Darkens the area behind menus (only while the mouse cursor is shown) so text stays readable. 0 = off.",
+            MenuBackdropOpacity = config.Bind("UI Panel", "Menu Backdrop Opacity", 0f,
+                new ConfigDescription("Darkens the whole panel behind menus (only while the mouse cursor is shown). 0 = off. Try 0.3 if menu text is hard to read against bright scenes.",
                     new AcceptableValueRange<float>(0f, 1f)));
             FlipVertically = config.Bind("UI Panel", "Flip Vertically", false,
                 "Turn on if the UI appears upside down in the headset. Can also be toggled in game with the Flip UI hotkey.");
@@ -106,8 +116,11 @@ namespace VoidCrewVRUIFix
             DisableUuvrHelperCameras = config.Bind("Fixes", "Disable UUVR Helper Cameras", true,
                 "Turns off the hidden helper cameras UUVR creates for head tracking. HDRP renders each one as a full extra VR camera, which costs a lot of FPS. " +
                 "Only applied when UUVR's Camera Tracking Mode is RelativeTransform (the default).");
-            ShowVrViewOnDesktop = config.Bind("Fixes", "Show VR View On Desktop", true,
-                "Shows what the headset sees in the game window (with the UI on top), so you can play from the game window.");
+            DesktopView = config.Bind("Fixes", "Desktop View", DesktopViewMode.PanelView,
+                "What the game window on your monitor shows while in VR.\n" +
+                "PanelView: the headset image cropped to the area the UI panel covers, with the UI and cursor on top. Looks and plays like the normal game.\n" +
+                "HeadsetMirror: SteamVR's own mirror of one eye (zoomed in, no UI).\n" +
+                "UiOnly: just the UI on black (lightest on performance).");
             ClearDesktopEachFrame = config.Bind("Fixes", "Clear Desktop Each Frame", true,
                 "Clears the game window every frame. Stops old UI images being left behind as 'ghosts' or trails on the desktop.");
 
@@ -123,7 +136,26 @@ namespace VoidCrewVRUIFix
             SubmitOverlayOnRenderThread = config.Bind("Debug", "Submit Overlay On Render Thread", true,
                 "Advanced. Sends the UI image to SteamVR from Unity's render thread (correct ordering). Turn off only if the game crashes when the SteamVR overlay is used.");
             VerboseLogging = config.Bind("Debug", "Verbose Logging", false,
-                "Logs extra detail about every change the plugin makes. Leave off unless you are diagnosing a problem.");
+                "Logs extra detail about every change the plugin makes, and what is under the mouse on every click. Leave off unless you are diagnosing a problem.");
+
+            _settingsVersion = config.Bind("Debug", "Settings Version", 0,
+                "Used by the plugin to update settings saved by older versions. Don't change it.");
+            Migrate();
+        }
+
+        /// <summary>Updates values saved by older plugin versions whose defaults turned out to be wrong.</summary>
+        private static void Migrate()
+        {
+            int version = _settingsVersion.Value;
+            if (version >= CurrentSettingsVersion) return;
+
+            if (version < 2 && MenuBackdropOpacity.Value == 0.5f)
+            {
+                // 3.0.0 darkened the panel behind menus by default, which showed as a grey box.
+                MenuBackdropOpacity.Value = 0f;
+                Log.Info("Settings updated from an older version: Menu Backdrop Opacity 0.5 -> 0 (new default).");
+            }
+            _settingsVersion.Value = CurrentSettingsVersion;
         }
     }
 }

@@ -136,9 +136,10 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Width (degrees) | 70 | How much of your view the panel covers |
 | UI Panel → Height Offset | 0 | Moves the panel up or down, in metres |
 | UI Panel → Anchor | GameCamera | `GameCamera` keeps the panel in front of the in-game view, so markers line up and you can look around it. `Head` locks it to your head |
-| UI Panel → Menu Backdrop Opacity | 0.5 | Darkens the area behind menus so text is easier to read (0 = off) |
+| UI Panel → Menu Backdrop Opacity | 0 | Darkens the panel behind menus if text is hard to read against bright scenes (try 0.3) |
 | Cursor → Cursor Scale | 1 | Size of the VR cursor |
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
+| Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (the VR view with the UI and cursor, plays like the normal game), `HeadsetMirror` (SteamVR's zoomed mirror, no UI) or `UiOnly` |
 
 Every setting has a description in the file.
 

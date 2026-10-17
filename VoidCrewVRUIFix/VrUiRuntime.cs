@@ -18,6 +18,7 @@ namespace VoidCrewVRUIFix
         private const float HealthCheckDelay = 5f;
 
         private readonly UiCapture _capture = new UiCapture();
+        private readonly DesktopView _desktop = new DesktopView();
         private readonly CanvasMover _canvases = new CanvasMover();
         private CursorOverlay _cursor;
         private IUiDisplay _display;
@@ -34,12 +35,17 @@ namespace VoidCrewVRUIFix
         public Camera MainCamera { get { return _mainCamera; } }
         public CursorOverlay Cursor { get { return _cursor; } }
         public CanvasMover Canvases { get { return _canvases; } }
+        public DesktopView Desktop { get { return _desktop; } }
 
         private void Awake()
         {
             _cursor = new CursorOverlay(transform);
             _capture.TextureCreated = texture => { if (_display != null) _display.SetTexture(texture); };
             _capture.AfterCapture = commands => { if (_display != null) _display.AppendSubmit(commands); };
+            _capture.FrameRendered = (context, camera) =>
+            {
+                if (Settings.DesktopView.Value == DesktopViewMode.PanelView) _desktop.Draw(context, camera);
+            };
         }
 
         private void OnEnable()
@@ -83,7 +89,9 @@ namespace VoidCrewVRUIFix
             }
             if (!vrActive) return;
 
-            if (Settings.ShowVrViewOnDesktop.Value && !XRSettings.showDeviceView) XRSettings.showDeviceView = true;
+            // Unity's own mirror is drawn over the screen-space UI, so it is only used when chosen explicitly.
+            bool unityMirror = Settings.DesktopView.Value == DesktopViewMode.HeadsetMirror;
+            if (XRSettings.showDeviceView != unityMirror) XRSettings.showDeviceView = unityMirror;
 
             if (Time.unscaledTime >= _nextMaintenance)
             {
@@ -105,6 +113,16 @@ namespace VoidCrewVRUIFix
 
             HandleHotkeys();
             CheckHealth();
+            if (Settings.VerboseLogging.Value) LogClicks();
+        }
+
+        /// <summary>Verbose logging only: where each click lands, to diagnose buttons that don't respond.</summary>
+        private static void LogClicks()
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+            Log.Verbose("Click at " + mouse.position.ReadValue() + ", game window focused " + Application.isFocused +
+                        ", UI under the mouse: " + Diagnostics.DescribeUiUnderMouse(3));
         }
 
         private void OnBeforeRender()
@@ -164,7 +182,7 @@ namespace VoidCrewVRUIFix
             _nextMaintenance = 0f;
             _nextDisplayAttempt = 0f;
             _capture.Enabled = true;
-            Log.Info("VR started (" + XrState.DeviceName + ", eye texture " + XRSettings.eyeTextureWidth + "x" + XRSettings.eyeTextureHeight + ").");
+            Log.Info("VR started (" + XrState.DeviceName + "). Game window shows: " + Settings.DesktopView.Value + ".");
             GamePatches.RefreshHardwareCursor();
         }
 
@@ -310,6 +328,12 @@ namespace VoidCrewVRUIFix
 
             string problem = _display != null ? _display.CheckHealth() : null;
             if (problem != null) Log.WarnOnce("health-" + _display.Name, problem);
+
+            if (Settings.DesktopView.Value == DesktopViewMode.PanelView && _desktop.LastDrawnFrame < Time.frameCount - 120)
+            {
+                Log.WarnOnce("health-desktop", "The game window isn't showing the VR view (" + (_desktop.Problem ?? "unknown reason") +
+                                               "). Set 'Desktop View' to HeadsetMirror in the config as a workaround, and press F9 for a bug report.");
+            }
         }
 
         private static void ClearDesktop()

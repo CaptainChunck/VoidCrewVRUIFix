@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.UIElements;
@@ -20,6 +23,7 @@ namespace VoidCrewVRUIFix
     /// </summary>
     internal static class Diagnostics
     {
+        private static readonly List<RaycastResult> Hits = new List<RaycastResult>();
         private static Type _stateMachineType;
         private static PropertyInfo _currentStateProperty;
         private static UnityEngine.Object _stateMachine;
@@ -58,6 +62,19 @@ namespace VoidCrewVRUIFix
                                    "', backdrop " + capture.BackdropOpacity.ToString("0.00"));
             Line(report, "Player camera", runtime.MainCamera != null ? Describe(runtime.MainCamera) : "none");
             Line(report, "Cursor", runtime.Cursor.Describe() + " | game wants cursor " + UnityEngine.Cursor.visible + ", lock " + UnityEngine.Cursor.lockState);
+            Line(report, "Desktop view", runtime.Desktop.Describe() + ", Unity mirror " + XRSettings.showDeviceView);
+
+            Section(report, "Input");
+            Line(report, "Game window focused", Application.isFocused + " (clicks only reach the game while its window is focused)");
+            EventSystem eventSystem = EventSystem.current;
+            Line(report, "Event system", eventSystem == null ? "none" : "'" + eventSystem.name + "' using " +
+                (eventSystem.currentInputModule != null ? eventSystem.currentInputModule.GetType().Name : "no input module"));
+            Line(report, "Mouse position", Mouse.current != null ? Mouse.current.position.ReadValue().ToString() : "no mouse");
+            Line(report, "uGUI/panels under mouse", DescribeUiUnderMouse(5));
+            Line(report, "UI Toolkit under mouse", DescribeUiToolkitUnderMouse());
+            var devices = new List<string>();
+            foreach (UnityEngine.InputSystem.InputDevice device in InputSystem.devices) devices.Add(device.displayName ?? device.name);
+            Line(report, "Input devices", string.Join(", ", devices.ToArray()));
             Line(report, "Canvases moved to panel", runtime.Canvases.MovedCount.ToString());
             Line(report, "Intro video", IntroVideo.Describe());
             Line(report, "Marker alignment", MarkerAlignment.Active ? "on (camera '" + (MarkerAlignment.PlayerCamera != null ? MarkerAlignment.PlayerCamera.name : "none") + "')" : "off");
@@ -179,6 +196,54 @@ namespace VoidCrewVRUIFix
                     Log.Failure("Saving the VR UI snapshot", e);
                 }
             });
+        }
+
+        /// <summary>The uGUI raycast hits under the mouse, top first. UI Toolkit panels show up as their panel object.</summary>
+        public static string DescribeUiUnderMouse(int max)
+        {
+            EventSystem eventSystem = EventSystem.current;
+            Mouse mouse = Mouse.current;
+            if (eventSystem == null) return "no event system";
+            if (mouse == null) return "no mouse";
+
+            var pointer = new PointerEventData(eventSystem) { position = mouse.position.ReadValue() };
+            Hits.Clear();
+            eventSystem.RaycastAll(pointer, Hits);
+            if (Hits.Count == 0) return "nothing";
+
+            var text = new StringBuilder();
+            for (int i = 0; i < Hits.Count && i < max; i++)
+            {
+                RaycastResult hit = Hits[i];
+                if (i > 0) text.Append(" > ");
+                text.Append('\'').Append(hit.gameObject != null ? PathOf(hit.gameObject.transform) : "?").Append("' (")
+                    .Append(hit.module != null ? hit.module.GetType().Name : "?").Append(')');
+            }
+            if (Hits.Count > max) text.Append(" and ").Append(Hits.Count - max).Append(" more");
+            return text.ToString();
+        }
+
+        /// <summary>The UI Toolkit element under the mouse in each visible document.</summary>
+        private static string DescribeUiToolkitUnderMouse()
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse == null) return "no mouse";
+            Vector2 screen = mouse.position.ReadValue();
+
+            var found = new List<string>();
+            foreach (UIDocument document in UnityEngine.Object.FindObjectsOfType<UIDocument>())
+            {
+                VisualElement root = document.rootVisualElement;
+                IPanel panel = root != null ? root.panel : null;
+                if (panel == null) continue;
+
+                // UI Toolkit measures from the top-left corner, the mouse from the bottom-left.
+                Vector2 panelPosition = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screen.x, Screen.height - screen.y));
+                VisualElement picked = panel.Pick(panelPosition);
+                if (picked == null || picked == root) continue;
+                found.Add(document.name + ": " + picked.GetType().Name + (string.IsNullOrEmpty(picked.name) ? "" : " '" + picked.name + "'"));
+            }
+            return found.Count == 0 ? "nothing" : string.Join(" | ", found.ToArray());
         }
 
         private static string Describe(Camera camera)

@@ -29,6 +29,9 @@ namespace VoidCrewVRUIFix
         /// <summary>Called inside the render context right after the UI was drawn, so displays can queue their submit.</summary>
         public Action<CommandBuffer> AfterCapture;
 
+        /// <summary>Called inside the render context once the frame's headset images are finished, before the capture.</summary>
+        public Action<ScriptableRenderContext, Camera> FrameRendered;
+
         public void Start()
         {
             RenderPipelineManager.endContextRendering += OnEndContextRendering;
@@ -73,10 +76,28 @@ namespace VoidCrewVRUIFix
                     break;
                 }
             }
-            if (screenCamera == null || !EnsureTexture()) return;
+            if (screenCamera == null) return;
 
             LastCaptureFrame = Time.frameCount;
             LastScreenCamera = screenCamera;
+
+            if (FrameRendered != null)
+            {
+                try
+                {
+                    FrameRendered(context, screenCamera);
+                }
+                catch (Exception e)
+                {
+                    Log.Failure("Drawing the desktop view", e);
+                }
+            }
+
+            if (!EnsureTexture())
+            {
+                context.Submit(); // still send the desktop view
+                return;
+            }
 
             _commands.Clear();
             _commands.SetRenderTarget(Texture);

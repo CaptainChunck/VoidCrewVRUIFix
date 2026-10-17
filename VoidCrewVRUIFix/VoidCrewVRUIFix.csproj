@@ -81,6 +81,10 @@
       <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.SubsystemsModule">
+      <HintPath>$(GameManaged)\UnityEngine.SubsystemsModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
@@ -109,6 +113,7 @@
   <ItemGroup>
     <Compile Include="CanvasMover.cs" />
     <Compile Include="CursorOverlay.cs" />
+    <Compile Include="DesktopView.cs" />
     <Compile Include="Diagnostics.cs" />
     <Compile Include="GamePatches.cs" />
     <Compile Include="HdrpTweaks.cs" />
