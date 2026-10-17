@@ -19,6 +19,7 @@ UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip:
 | No mouse cursor in VR | A cursor is shown on the panel whenever the game wants one |
 | The game window on your monitor is black | The game window shows what the headset sees, with the UI on top, so you can play from it |
 | The player status HUD sits in a corner of the UI screen, out of view when you look around | It follows your head, at a place you choose |
+| The crosshair stays in front of the game camera, and you can only aim with the mouse | The crosshair stays in the middle of your view, and you aim and interact where you look |
 | Pings, objective markers and "press E" prompts don't line up with objects | They're placed on the panel so they sit over the objects they belong to |
 | Turning on DLSS breaks VR | DLSS and FSR3 are removed from the graphics options while UUVR is installed |
 | The intro video doesn't show | The intro video plays on the panel |
@@ -137,6 +138,7 @@ The easiest way to change the VR settings is in the game itself: open **Settings
 | UI shown as | Automatic, SteamVR overlay (sharpest) or drawn into the game image (also works with OpenXR) |
 | UI screen size, distance, height | How big the floating UI screen looks, how far away it is, and how high |
 | UI screen follows your head | On: the UI stays in front of your eyes. Off: it stays in front of the game camera, so markers line up with the world |
+| Aim with your head | While you play, the crosshair stays in the middle of your view and weapons, tools and "press E" interactions aim where you look. Your body still turns with the mouse; menus and terminals stay put. On by default |
 | Player HUD follows your head, left/right, up/down, distance, size | The player status HUD (portrait, health, oxygen, temperature) stays in view wherever you look, where you put it. The HUD shows in the headset while you change these |
 | Darken world behind menus | Puts a dark layer over the world while a menu or terminal is open, to make text easier to read. Off by default |
 | VR mouse pointer size | Size of the mouse pointer on the UI screen |
@@ -167,6 +169,7 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Width (degrees) | 70 | How much of your view the panel covers |
 | UI Panel → Height Offset | 0 | Moves the panel up or down, in metres |
 | UI Panel → Anchor | GameCamera | `GameCamera` keeps the panel in front of the in-game view, so markers line up and you can look around it. `Head` locks it to your head |
+| Aiming → Aim With Your Head | true | The crosshair stays in the middle of your view while you play, and weapons, tools and interactions aim where you look |
 | Player HUD → Follows Your Head | true | Locks the player status HUD to your head; Left/Right, Up/Down (degrees), Distance (metres) and Size place it |
 | UI Panel → Menu Backdrop Opacity | 0 | Darkens the world behind menus if text is hard to read against bright scenes (try 0.3). At 1 the world behind menus is completely black |
 | Cursor → Cursor Scale | 1 | Size of the VR cursor |

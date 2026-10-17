@@ -211,6 +211,10 @@ namespace VoidCrewVRUIFix
             AddToggle(rows, refreshers, "UI SCREEN FOLLOWS YOUR HEAD",
                 "On: the UI screen stays in front of your eyes wherever you look. Off (default): it stays in front of the game camera, so you can look around it, and markers and pings line up with the world.",
                 () => Settings.Anchor.Value == PanelAnchor.Head, on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
+            AddToggle(rows, refreshers, "AIM WITH YOUR HEAD",
+                "On (default): while you play, the crosshair stays in the middle of your view, and your weapons, tools and 'press E' interactions aim where you look. " +
+                "Your body still turns with the mouse. Menus and terminals stay put in front of you. Off: you aim with the mouse only.",
+                () => Settings.AimWithHead.Value, on => Settings.AimWithHead.Value = on);
             const string HudPreview = " The HUD shows in the headset for a few seconds while you change this, so you can see where it goes.";
             AddToggle(rows, refreshers, "PLAYER HUD FOLLOWS YOUR HEAD",
                 "On (default): the player status HUD (portrait, health, oxygen, temperature) is locked to your head, so it stays in view wherever you look. " +

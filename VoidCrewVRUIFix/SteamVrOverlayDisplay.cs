@@ -523,7 +523,7 @@ namespace VoidCrewVRUIFix
 
         private void ApplyPlacement()
         {
-            PanelAnchor anchor = Settings.Anchor.Value;
+            PanelAnchor anchor = HeadAim.PanelFollowsHead ? PanelAnchor.Head : PanelAnchor.GameCamera;
             Vector3 position;
             if (anchor == PanelAnchor.Head)
             {

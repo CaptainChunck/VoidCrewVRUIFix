@@ -124,6 +124,7 @@
     <Compile Include="FullscreenFill.cs" />
     <Compile Include="GamePatches.cs" />
     <Compile Include="HdrpTweaks.cs" />
+    <Compile Include="HeadAim.cs" />
     <Compile Include="HeadsetPresence.cs" />
     <Compile Include="HotkeyCapture.cs" />
     <Compile Include="HudLayer.cs" />

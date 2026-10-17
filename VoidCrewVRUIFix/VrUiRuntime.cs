@@ -170,6 +170,7 @@ namespace VoidCrewVRUIFix
             // A terminal's screen is part of the world, so it isn't darkened like a menu.
             _capture.BackdropOpacity = menuOpen && !PanelLayout.OnTerminalScreen ? Settings.MenuBackdropOpacity.Value : 0f;
             _hud.Update(menuOpen, _fill.Current.a > 0.003f);
+            HeadAim.Update(true, menuOpen);
             _desktop.UiInSceneImage = _display is InGamePanelDisplay;
             _cursor.Update(Settings.ShowVrCursor.Value && menuOpen);
             IntroVideo.Update();
@@ -281,6 +282,7 @@ namespace VoidCrewVRUIFix
             VrPerformance.OnVrStopped();
             PanelLayout.LeaveTerminal();
             _hud.Stop();
+            HeadAim.Stop();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;

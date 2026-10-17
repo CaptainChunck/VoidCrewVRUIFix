@@ -61,7 +61,7 @@ namespace VoidCrewVRUIFix
 
             _pass.Visible = state.Visible && state.Camera != null && _pass.Texture != null;
             _pass.FlipVertically = Settings.FlipVertically.Value;
-            _pass.HeadLocked = Settings.Anchor.Value == PanelAnchor.Head;
+            _pass.HeadLocked = HeadAim.PanelFollowsHead;
             _pass.PanelInCamera = Matrix4x4.TRS(
                 new Vector3(0f, PanelLayout.HeightOffset, PanelLayout.Distance),
                 Quaternion.identity,

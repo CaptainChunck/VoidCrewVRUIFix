@@ -43,6 +43,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<float> MenuBackdropOpacity;
         public static ConfigEntry<bool> FlipVertically;
 
+        public static ConfigEntry<bool> AimWithHead;
         public static ConfigEntry<bool> HudFollowsHead;
         public static ConfigEntry<float> HudLeftRight;
         public static ConfigEntry<float> HudUpDown;
@@ -117,6 +118,10 @@ namespace VoidCrewVRUIFix
             FlipVertically = config.Bind("UI Panel", "Flip Vertically", false,
                 "Turn on if the UI appears upside down in the headset. Can also be toggled in game with the Flip UI hotkey.");
 
+            AimWithHead = config.Bind("Aiming", "Aim With Your Head", true,
+                "While you play (no menu or terminal open), the UI screen follows your head so the crosshair stays in the middle of your view, " +
+                "and weapons, tools and 'press E' interactions aim where you look. Your body still turns with the mouse. " +
+                "Off: you aim with the mouse only and the crosshair stays in front of the game camera.");
             HudFollowsHead = config.Bind("Player HUD", "Follows Your Head", true,
                 "Shows the player status HUD (portrait, health, oxygen, temperature) locked to your head, so it stays in view wherever you look. " +
                 "Off: it stays on the UI screen with the rest of the HUD.");

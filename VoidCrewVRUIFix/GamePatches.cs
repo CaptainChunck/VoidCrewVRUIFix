@@ -38,6 +38,11 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "CG.Client.Ship.Modules.Mediators.TerminalModuleMediator", "DelayedParentWorldUiPanel", nameof(ShipTerminalEntered), null,
                 "ship terminal screens", applied, skipped);
             Patch(harmony, "CG.Client.UI.Terminals.WorldSpaceUI", "TransformPointerEvent", nameof(TerminalScreenPointer), null, "terminal screen clicks", applied, skipped);
+            Patch(harmony, "Opsive.UltimateCharacterController.FirstPersonController.Camera.ViewTypes.FirstPerson", "GetCrosshairsDeltaRotation", null,
+                nameof(AimWhereYouLook), "head aim (weapons)", applied, skipped);
+            PatchLookWithHead(harmony, "CG.Client.Player.Interactions.RaycastHandler", "FindInteractable", "head aim (interactions)", applied, skipped);
+            PatchLookWithHead(harmony, "UI.Ping.PingAbility", "GetPingInfo", "head aim (quick ping)", applied, skipped);
+            PatchLookWithHead(harmony, "UI.Ping.PingDefinition", "GetTarget", "head aim (ping wheel)", applied, skipped);
             // Always on, even when DLSS is hidden from the options: if DLSS still ends up running in VR (for example a
             // setting saved before the plugin was installed), HDRP's DLSS fails on every frame without it, and the
             // headset shows nothing.
@@ -105,6 +110,27 @@ namespace VoidCrewVRUIFix
                 return;
             }
             PatchMethod(harmony, target, prefix, postfix, label, applied, skipped);
+        }
+
+        private static void PatchLookWithHead(Harmony harmony, string typeName, string methodName, string label, List<string> applied, List<string> skipped)
+        {
+            MethodInfo target;
+            try
+            {
+                Type type = AccessTools.TypeByName(typeName);
+                target = type != null ? AccessTools.DeclaredMethod(type, methodName) : null;
+            }
+            catch (Exception e)
+            {
+                skipped.Add(label + " (" + e.GetType().Name + ": " + e.Message + ")");
+                return;
+            }
+            if (target == null)
+            {
+                skipped.Add(label + " (" + typeName + "." + methodName + " not found)");
+                return;
+            }
+            PatchMethod(harmony, target, nameof(LookWithHead), null, label, applied, skipped, nameof(LookWithHeadEnd));
         }
 
         private static void PatchMethod(Harmony harmony, MethodBase target, string prefix, string postfix,
@@ -252,6 +278,29 @@ namespace VoidCrewVRUIFix
             if (!TerminalScreens.Applies) return true;
             __result = TerminalScreens.EnterShipTerminal(__instance);
             return false;
+        }
+
+        // Opsive aims items along the camera turned by this "crosshair offset" (it leaves the character's own turning
+        // alone). With head aim, the offset is the turn from the game camera to the line through the crosshair in VR.
+        private static void AimWhereYouLook(ref Quaternion __result)
+        {
+            if (!HeadAim.Aiming) return;
+            Camera camera = MarkerAlignment.PlayerCamera;
+            if (camera == null) return;
+            __result = Quaternion.Inverse(camera.transform.rotation) * HeadAim.AimRotation(camera) * __result;
+        }
+
+        // Game code that aims along the game camera's forward direction. With head aim, the camera is turned to your
+        // view while each runs ("press E" interactions, the quick ping and the ping wheel).
+        private static void LookWithHead(ref Quaternion? __state)
+        {
+            __state = HeadAim.TurnCamera();
+        }
+
+        // A finalizer, so the camera is turned back even if the game code throws.
+        private static void LookWithHeadEnd(Quaternion? __state)
+        {
+            HeadAim.TurnCameraBack(__state);
         }
 
         // Mouse positions are mapped onto a terminal screen that isn't attached to the camera.

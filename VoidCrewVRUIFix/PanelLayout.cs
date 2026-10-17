@@ -84,7 +84,9 @@ namespace VoidCrewVRUIFix
     /// Screen to world: in-world terminals aim the mouse with ScreenToWorldPoint (and world-space canvases with
     /// ScreenPointToRay), so clicks land where the VR cursor appears on the panel.
     /// Outside rendering the camera transform is the in-game view direction (UUVR only applies the head rotation
-    /// while a frame renders), which is exactly the frame the GameCamera-anchored panel is placed in.
+    /// while a frame renders), which is exactly the frame the GameCamera-anchored panel is placed in. While the panel
+    /// follows the head (head aim, or "UI screen follows your head"), the head's view direction is used instead, so
+    /// markers still line up with the world and the crosshair ray goes where you look.
     /// </summary>
     internal static class MarkerAlignment
     {
@@ -99,7 +101,7 @@ namespace VoidCrewVRUIFix
         public static Vector3 WorldToViewport(Camera camera, Vector3 worldPosition)
         {
             Transform t = camera.transform;
-            Vector3 local = Quaternion.Inverse(t.rotation) * (worldPosition - t.position);
+            Vector3 local = Quaternion.Inverse(ViewRotation(camera)) * (worldPosition - t.position);
             float z = local.z;
             if (Mathf.Abs(z) < 1e-4f) z = z < 0f ? -1e-4f : 1e-4f;
 
@@ -121,15 +123,21 @@ namespace VoidCrewVRUIFix
         public static Vector3 ScreenToWorld(Camera camera, Vector3 screen)
         {
             Transform t = camera.transform;
-            return t.position + t.rotation * (ScreenDirection(screen) * screen.z);
+            return t.position + ViewRotation(camera) * (ScreenDirection(screen) * screen.z);
         }
 
         /// <summary>Like Camera.ScreenPointToRay: starts on the near plane and points through the screen position.</summary>
         public static Ray ScreenToRay(Camera camera, Vector3 screen)
         {
             Transform t = camera.transform;
-            Vector3 direction = t.rotation * ScreenDirection(screen);
+            Vector3 direction = ViewRotation(camera) * ScreenDirection(screen);
             return new Ray(t.position + direction * camera.nearClipPlane, direction.normalized);
+        }
+
+        /// <summary>The direction the UI panel is shown in front of: the game camera's, or the head's while the panel follows it.</summary>
+        private static Quaternion ViewRotation(Camera camera)
+        {
+            return HeadAim.PanelFollowsHead ? HeadAim.ViewRotation(camera) : camera.transform.rotation;
         }
 
         /// <summary>Camera-local direction (z = 1) through a screen position on the panel.</summary>

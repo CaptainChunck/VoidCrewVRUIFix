@@ -191,6 +191,47 @@ namespace VoidCrewVRUIFix
                      "'. HDRP was rendering it as a full extra VR camera every frame.");
         }
 
+        // Looked up once per camera (and again every second while UUVR hasn't made its helper camera yet).
+        private static Camera _viewCamera;
+        private static Camera _viewHelper;
+        private static float _nextViewLookup;
+        private static string _tracking;
+        private static float _nextTrackingCheck;
+
+        /// <summary>
+        /// The world rotation UUVR draws this camera with. In UUVR's usual tracking mode that is its hidden tracking
+        /// camera's rotation: the game camera turned by the headset (and levelled, with "keep horizon level"). In its
+        /// Absolute mode the game camera itself already follows the headset. False if neither applies.
+        /// </summary>
+        public static bool TryGetViewRotation(Camera camera, out Quaternion rotation)
+        {
+            rotation = Quaternion.identity;
+            if (camera == null || _vrCameraType == null) return false;
+
+            if (Time.unscaledTime >= _nextTrackingCheck)
+            {
+                _nextTrackingCheck = Time.unscaledTime + 1f;
+                _tracking = CameraTracking;
+            }
+            if (_tracking == "Absolute")
+            {
+                rotation = camera.transform.rotation;
+                return true;
+            }
+
+            if (_childCameraField == null) return false;
+            if (!ReferenceEquals(camera, _viewCamera) || (_viewHelper == null && Time.unscaledTime >= _nextViewLookup))
+            {
+                _viewCamera = camera;
+                _nextViewLookup = Time.unscaledTime + 1f;
+                Component vrCamera = camera.GetComponent(_vrCameraType);
+                _viewHelper = vrCamera != null ? _childCameraField.GetValue(vrCamera) as Camera : null;
+            }
+            if (_viewHelper == null || !_viewHelper.gameObject.activeInHierarchy) return false;
+            rotation = _viewHelper.transform.rotation;
+            return true;
+        }
+
         /// <summary>Cameras UUVR creates for itself. They must never be picked as the player's camera.</summary>
         public static bool IsUuvrInternalCamera(Camera camera)
         {

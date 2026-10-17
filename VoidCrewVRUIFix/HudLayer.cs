@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 namespace VoidCrewVRUIFix
 {
     /// <summary>
-    /// The player status HUD (portrait, health, oxygen, temperature and its key hints) as its own layer locked to your
+    /// The player status HUD (portrait, health, oxygen, temperature, its key hints and the class ability above it) as its own layer locked to your
     /// head, so it stays in view wherever you look, at a place you choose in the VR tab. In each gameplay frame the HUD's
     /// rectangle is copied out of the captured UI into its own texture and cleared from the UI screen. The crosshair,
     /// markers and prompts stay on the UI screen, lined up with where you aim. While a HUD setting is being changed, the
@@ -26,14 +26,31 @@ namespace VoidCrewVRUIFix
         private const float PlaceholderWidthShare = 0.27f;
         private const float PlaceholderHeightShare = 0.2f;
 
-        // The game's status HUD (UI.MainHUD.PlayerHUD) draws these containers of its UI document.
-        private static readonly string[] HudElementNames = { "LocalPlayerContainer", "KeybindsContainer" };
+        /// <summary>A game HUD component and the containers of its UI document that belong to the status HUD.</summary>
+        private sealed class Source
+        {
+            public readonly string TypeName;
+            public readonly string[] ElementNames;
+            public readonly List<VisualElement> Elements = new List<VisualElement>();
+            public Type Type;
+            public bool TypeLookupDone;
+            public Component Component;
+            public VisualElement CachedRoot;
 
-        private readonly List<VisualElement> _hudElements = new List<VisualElement>();
-        private Type _playerHudType;
-        private bool _typeLookupDone;
-        private Component _playerHud;
-        private VisualElement _cachedRoot;
+            public Source(string typeName, params string[] elementNames)
+            {
+                TypeName = typeName;
+                ElementNames = elementNames;
+            }
+        }
+
+        // The status HUD (portrait, health, oxygen, temperature, key hints) and the class ability display above it.
+        private readonly Source[] _sources =
+        {
+            new Source("UI.MainHUD.PlayerHUD", "LocalPlayerContainer", "KeybindsContainer"),
+            new Source("ClassAbilityDisplay", "ClassAbilityContainer")
+        };
+
         private float _nextFind;
 
         private RectInt _pixelRect;
@@ -91,7 +108,12 @@ namespace VoidCrewVRUIFix
         public string Describe()
         {
             if (!Settings.HudFollowsHead.Value) return "off (the status HUD stays on the UI screen)";
-            string found = _playerHud != null ? "found" : (_playerHudType == null && _typeLookupDone ? "the game's HUD type was not found" : "not on screen");
+            var parts = new List<string>();
+            foreach (Source source in _sources)
+            {
+                parts.Add(source.TypeName + " " + (source.Component != null ? "found" : (source.TypeLookupDone && source.Type == null ? "missing from the game" : "not on screen")));
+            }
+            string found = string.Join(", ", parts.ToArray());
             return found + (_extract ? ", copied this frame from " + _pixelRect.width + "x" + _pixelRect.height + " at " + _pixelRect.x + "," + _pixelRect.y : "") +
                    (Previewing ? ", previewing" : "") +
                    string.Format(" | {0:0}° left/right, {1:0}° up/down, {2:0.00} m away, size x{3:0.0}",
@@ -181,22 +203,31 @@ namespace VoidCrewVRUIFix
             _hasCopy = false;
         }
 
+        /// <summary>True when at least one of the HUD components is on screen. Missing ones are looked for once a second.</summary>
         private bool FindHud()
         {
-            if (_playerHud != null && _playerHud.gameObject.activeInHierarchy) return true;
-            if (Time.unscaledTime < _nextFind) return false;
-            _nextFind = Time.unscaledTime + FindInterval;
+            bool searchNow = Time.unscaledTime >= _nextFind;
+            if (searchNow) _nextFind = Time.unscaledTime + FindInterval;
 
-            if (!_typeLookupDone)
+            bool any = false;
+            foreach (Source source in _sources)
             {
-                _typeLookupDone = true;
-                _playerHudType = AccessTools.TypeByName("UI.MainHUD.PlayerHUD");
-                if (_playerHudType == null) Log.Warn("The game's status HUD was not found (the game may have been updated); it stays on the UI screen.");
+                if (source.Component == null || !source.Component.gameObject.activeInHierarchy)
+                {
+                    if (!searchNow) continue;
+                    if (!source.TypeLookupDone)
+                    {
+                        source.TypeLookupDone = true;
+                        source.Type = AccessTools.TypeByName(source.TypeName);
+                        if (source.Type == null) Log.Warn("The game's " + source.TypeName + " HUD was not found (the game may have been updated); it stays on the UI screen.");
+                    }
+                    if (source.Type == null) continue;
+                    source.Component = UnityEngine.Object.FindObjectOfType(source.Type) as Component;
+                    if (source.Component == null || !source.Component.gameObject.activeInHierarchy) continue;
+                }
+                any = true;
             }
-            if (_playerHudType == null) return false;
-
-            _playerHud = UnityEngine.Object.FindObjectOfType(_playerHudType) as Component;
-            return _playerHud != null && _playerHud.gameObject.activeInHierarchy;
+            return any;
         }
 
         /// <summary>
@@ -207,35 +238,49 @@ namespace VoidCrewVRUIFix
         private bool TryGetHudRect(out RectInt rect)
         {
             rect = default(RectInt);
-            var document = _playerHud.GetComponent<UIDocument>();
-            VisualElement root = document != null ? document.rootVisualElement : null;
-            if (root == null || root.panel == null) return false;
-            Rect panelRect = root.panel.visualTree.worldBound;
-            if (panelRect.width < 1f || panelRect.height < 1f) return false;
-
-            if (!ReferenceEquals(root, _cachedRoot))
-            {
-                // The document rebuilds its tree when it is re-enabled; look the containers up again then.
-                _cachedRoot = root;
-                _hudElements.Clear();
-                foreach (string name in HudElementNames)
-                {
-                    VisualElement element = root.Q(name);
-                    if (element != null) _hudElements.Add(element);
-                }
-            }
-
-            var bounds = new Rect();
+            var screenBounds = new Rect();
             bool any = false;
-            foreach (VisualElement element in _hudElements) AddContent(element, panelRect, ref bounds, ref any);
+            foreach (Source source in _sources)
+            {
+                if (source.Component == null || !source.Component.gameObject.activeInHierarchy) continue;
+                var document = source.Component.GetComponent<UIDocument>();
+                VisualElement root = document != null ? document.rootVisualElement : null;
+                if (root == null || root.panel == null) continue;
+                Rect panelRect = root.panel.visualTree.worldBound;
+                if (panelRect.width < 1f || panelRect.height < 1f) continue;
+
+                if (!ReferenceEquals(root, source.CachedRoot))
+                {
+                    // The document rebuilds its tree when it is re-enabled; look the containers up again then.
+                    source.CachedRoot = root;
+                    source.Elements.Clear();
+                    foreach (string name in source.ElementNames)
+                    {
+                        VisualElement element = root.Q(name);
+                        if (element != null) source.Elements.Add(element);
+                    }
+                }
+
+                var bounds = new Rect();
+                bool found = false;
+                foreach (VisualElement element in source.Elements) AddContent(element, panelRect, ref bounds, ref found);
+                if (!found) continue;
+
+                // Each document can scale its panel differently; convert to screen pixels (origin top left) per document.
+                float scaleX = Screen.width / panelRect.width;
+                float scaleY = Screen.height / panelRect.height;
+                Rect onScreen = Rect.MinMaxRect((bounds.xMin - panelRect.xMin) * scaleX, (bounds.yMin - panelRect.yMin) * scaleY,
+                    (bounds.xMax - panelRect.xMin) * scaleX, (bounds.yMax - panelRect.yMin) * scaleY);
+                screenBounds = any ? Rect.MinMaxRect(Mathf.Min(screenBounds.xMin, onScreen.xMin), Mathf.Min(screenBounds.yMin, onScreen.yMin),
+                    Mathf.Max(screenBounds.xMax, onScreen.xMax), Mathf.Max(screenBounds.yMax, onScreen.yMax)) : onScreen;
+                any = true;
+            }
             if (!any) return false;
 
-            float scaleX = Screen.width / panelRect.width;
-            float scaleY = Screen.height / panelRect.height;
-            int xMin = Snap((bounds.xMin - panelRect.xMin) * scaleX - Padding, false);
-            int xMax = Snap((bounds.xMax - panelRect.xMin) * scaleX + Padding, true);
-            int yMin = Snap(Screen.height - (bounds.yMax - panelRect.yMin) * scaleY - Padding, false);
-            int yMax = Snap(Screen.height - (bounds.yMin - panelRect.yMin) * scaleY + Padding, true);
+            int xMin = Snap(screenBounds.xMin - Padding, false);
+            int xMax = Snap(screenBounds.xMax + Padding, true);
+            int yMin = Snap(Screen.height - screenBounds.yMax - Padding, false);
+            int yMax = Snap(Screen.height - screenBounds.yMin + Padding, true);
             xMin = Mathf.Clamp(xMin, 0, Screen.width);
             xMax = Mathf.Clamp(xMax, 0, Screen.width);
             yMin = Mathf.Clamp(yMin, 0, Screen.height);
