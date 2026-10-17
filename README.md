@@ -141,6 +141,7 @@ Edit it with any text editor while the game is closed, or change settings live w
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
 | Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (what the headset shows, with the UI panel and cursor where they appear in VR), `HeadsetMirror` (Unity's zoomed mirror, no UI) or `UiOnly` |
 | Fixes → Desktop View Width (degrees) | 90 | How wide a view the game window shows in `PanelView` |
+| Testing → Control From VR View | true | While SteamVR's VR View window is focused, your keyboard, mouse buttons and mouse-look still control the game (handy for testing without a headset; the scroll wheel isn't passed through) |
 
 Every setting has a description in the file.
 

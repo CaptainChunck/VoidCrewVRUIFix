@@ -130,6 +130,7 @@
     <Compile Include="UiDisplay.cs" />
     <Compile Include="UuvrCompat.cs" />
     <Compile Include="VrUiRuntime.cs" />
+    <Compile Include="VrViewInput.cs" />
     <Compile Include="XrState.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

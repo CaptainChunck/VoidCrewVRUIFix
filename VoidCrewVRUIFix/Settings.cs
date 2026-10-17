@@ -60,6 +60,8 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<Key> KeyRecenter;
         public static ConfigEntry<Key> KeyDiagnostics;
 
+        public static ConfigEntry<bool> ControlFromVrView;
+
         public static ConfigEntry<bool> SubmitOverlayOnRenderThread;
         public static ConfigEntry<bool> VerboseLogging;
         private static ConfigEntry<int> _settingsVersion;
@@ -136,6 +138,10 @@ namespace VoidCrewVRUIFix
                 "Moves the UI panel back in front of you.");
             KeyDiagnostics = config.Bind("Hotkeys", "Write Diagnostics", Key.F9,
                 "Writes a detailed diagnostics report to the BepInEx log and saves a picture of the VR UI texture. Include both when reporting a problem.");
+
+            ControlFromVrView = config.Bind("Testing", "Control From VR View", true,
+                "While SteamVR's VR View window is the focused window, pass your keyboard, mouse buttons and mouse-look to the game. " +
+                "Useful for testing without a headset. Has no effect while the game window itself is focused.");
 
             SubmitOverlayOnRenderThread = config.Bind("Debug", "Submit Overlay On Render Thread", true,
                 "Advanced. Sends the UI image to SteamVR from Unity's render thread (correct ordering). Turn off only if the game crashes when the SteamVR overlay is used.");

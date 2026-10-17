@@ -15,6 +15,7 @@ namespace VoidCrewVRUIFix
     internal sealed class UiCapture
     {
         private readonly CommandBuffer _commands = new CommandBuffer { name = "VoidCrewVRUIFix UI capture" };
+        private RenderTexture _sink;
 
         public RenderTexture Texture { get; private set; }
         public bool Enabled;
@@ -44,6 +45,12 @@ namespace VoidCrewVRUIFix
 
         public void Release()
         {
+            if (_sink != null)
+            {
+                _sink.Release();
+                UnityEngine.Object.Destroy(_sink);
+                _sink = null;
+            }
             if (Texture == null) return;
             Texture.Release();
             UnityEngine.Object.Destroy(Texture);
@@ -95,6 +102,7 @@ namespace VoidCrewVRUIFix
 
             if (!EnsureTexture())
             {
+                BindSink(context);
                 context.Submit(); // still send the desktop view
                 return;
             }
@@ -106,7 +114,7 @@ namespace VoidCrewVRUIFix
             _commands.Clear();
 
             // While VR is active HDRP reports that it does not render the UI overlay. Claim it for the duration of our
-            // draw, then hand it back so Unity still draws the UI onto the desktop window.
+            // draw, then hand it back.
             SupportedRenderingFeatures features = SupportedRenderingFeatures.active;
             bool previous = features != null && features.rendersUIOverlay;
             if (features != null) features.rendersUIOverlay = true;
@@ -116,6 +124,7 @@ namespace VoidCrewVRUIFix
                 if (AfterCapture != null) AfterCapture(_commands, Texture);
                 context.ExecuteCommandBuffer(_commands);
                 _commands.Clear();
+                BindSink(context);
                 context.Submit();
             }
             finally
@@ -123,6 +132,36 @@ namespace VoidCrewVRUIFix
                 if (features != null) features.rendersUIOverlay = previous;
             }
             CaptureCount++;
+        }
+
+        /// <summary>
+        /// After the render pipeline finishes, Unity draws the screen-space UI once more into whatever image was used
+        /// last. That has to go nowhere: on the game window it doubles the UI and cursor (the desktop picture already
+        /// has them), and in an eye image it is the "UI duplicated in the right eye" seen with UUVR alone.
+        /// </summary>
+        private void BindSink(ScriptableRenderContext context)
+        {
+            int width = Mathf.Max(1, Screen.width);
+            int height = Mathf.Max(1, Screen.height);
+            if (_sink == null || _sink.width != width || _sink.height != height || !_sink.IsCreated())
+            {
+                if (_sink != null)
+                {
+                    _sink.Release();
+                    UnityEngine.Object.Destroy(_sink);
+                }
+                _sink = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
+                {
+                    name = "VoidCrewVRUIFix_UnusedUiDraw",
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                _sink.Create();
+            }
+
+            _commands.Clear();
+            _commands.SetRenderTarget(_sink);
+            context.ExecuteCommandBuffer(_commands);
+            _commands.Clear();
         }
 
         private bool EnsureTexture()

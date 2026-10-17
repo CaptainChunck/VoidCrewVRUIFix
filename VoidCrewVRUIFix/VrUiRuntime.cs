@@ -20,6 +20,7 @@ namespace VoidCrewVRUIFix
         private readonly UiCapture _capture = new UiCapture();
         private readonly DesktopView _desktop = new DesktopView();
         private readonly CanvasMover _canvases = new CanvasMover();
+        private readonly VrViewInput _vrViewInput = new VrViewInput();
         private CursorOverlay _cursor;
         private IUiDisplay _display;
         private Camera _mainCamera;
@@ -121,6 +122,7 @@ namespace VoidCrewVRUIFix
             MarkerAlignment.PlayerCamera = _mainCamera;
             MarkerAlignment.Active = Settings.AlignMarkersToPanel.Value;
 
+            _vrViewInput.Update();
             HandleHotkeys();
             CheckHealth();
             if (Settings.VerboseLogging.Value) LogClicks();
@@ -202,6 +204,7 @@ namespace VoidCrewVRUIFix
             _capture.Enabled = false;
             StopDisplay(null);
             MarkerAlignment.Active = false;
+            _vrViewInput.Shutdown();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;

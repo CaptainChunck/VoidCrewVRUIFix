@@ -32,11 +32,17 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "VideoSwitcher", "SetupAndPlayVideo", null, nameof(RedirectIntroVideo), "intro video", applied, skipped);
             Patch(harmony, "CG.Input.MouseCursor", "UpdateCursorGraphic", nameof(HideHardwareCursorGraphic), null, "Windows cursor", applied, skipped);
 
-            // Patch both overloads: the one-argument version is small enough to be inlined into game code.
-            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "WorldToViewportPoint", new[] { typeof(Vector3) }),
-                nameof(RemapWorldToViewportMono), null, "marker alignment", applied, skipped);
-            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "WorldToViewportPoint", new[] { typeof(Vector3), typeof(Camera.MonoOrStereoscopicEye) }),
-                nameof(RemapWorldToViewport), null, "marker alignment (stereo overload)", applied, skipped);
+            // Both overloads of each are patched: the one-argument versions are small enough to be inlined into game code.
+            Type[] mono = { typeof(Vector3) };
+            Type[] withEye = { typeof(Vector3), typeof(Camera.MonoOrStereoscopicEye) };
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "WorldToViewportPoint", mono), nameof(WorldToViewportMono), null, "marker alignment", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "WorldToViewportPoint", withEye), nameof(WorldToViewport), null, "marker alignment (eye)", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "WorldToScreenPoint", mono), nameof(WorldToScreenMono), null, "screen alignment", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "WorldToScreenPoint", withEye), nameof(WorldToScreen), null, "screen alignment (eye)", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "ScreenToWorldPoint", mono), nameof(ScreenToWorldMono), null, "terminal mouse aim", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "ScreenToWorldPoint", withEye), nameof(ScreenToWorld), null, "terminal mouse aim (eye)", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "ScreenPointToRay", mono), nameof(ScreenPointToRayMono), null, "mouse rays", applied, skipped);
+            PatchMethod(harmony, AccessTools.Method(typeof(Camera), "ScreenPointToRay", withEye), nameof(ScreenPointToRay), null, "mouse rays (eye)", applied, skipped);
 
             Type mouseCursor = AccessTools.TypeByName("CG.Input.MouseCursor");
             if (mouseCursor != null)
@@ -132,16 +138,53 @@ namespace VoidCrewVRUIFix
             }
         }
 
-        private static bool RemapWorldToViewportMono(Camera __instance, Vector3 position, ref Vector3 __result)
+        // Camera projection prefixes: replace the result for the player camera while VR is on, otherwise run Unity's.
+
+        private static bool WorldToViewportMono(Camera __instance, Vector3 position, ref Vector3 __result)
         {
-            return RemapWorldToViewport(__instance, position, Camera.MonoOrStereoscopicEye.Mono, ref __result);
+            return WorldToViewport(__instance, position, Camera.MonoOrStereoscopicEye.Mono, ref __result);
         }
 
-        private static bool RemapWorldToViewport(Camera __instance, Vector3 position, Camera.MonoOrStereoscopicEye eye, ref Vector3 __result)
+        private static bool WorldToViewport(Camera __instance, Vector3 position, Camera.MonoOrStereoscopicEye eye, ref Vector3 __result)
         {
-            Vector3 remapped;
-            if (!MarkerAlignment.TryRemap(__instance, position, eye, out remapped)) return true;
-            __result = remapped;
+            if (!MarkerAlignment.Applies(__instance, eye)) return true;
+            __result = MarkerAlignment.WorldToViewport(__instance, position);
+            return false;
+        }
+
+        private static bool WorldToScreenMono(Camera __instance, Vector3 position, ref Vector3 __result)
+        {
+            return WorldToScreen(__instance, position, Camera.MonoOrStereoscopicEye.Mono, ref __result);
+        }
+
+        private static bool WorldToScreen(Camera __instance, Vector3 position, Camera.MonoOrStereoscopicEye eye, ref Vector3 __result)
+        {
+            if (!MarkerAlignment.Applies(__instance, eye)) return true;
+            __result = MarkerAlignment.WorldToScreen(__instance, position);
+            return false;
+        }
+
+        private static bool ScreenToWorldMono(Camera __instance, Vector3 position, ref Vector3 __result)
+        {
+            return ScreenToWorld(__instance, position, Camera.MonoOrStereoscopicEye.Mono, ref __result);
+        }
+
+        private static bool ScreenToWorld(Camera __instance, Vector3 position, Camera.MonoOrStereoscopicEye eye, ref Vector3 __result)
+        {
+            if (!MarkerAlignment.Applies(__instance, eye)) return true;
+            __result = MarkerAlignment.ScreenToWorld(__instance, position);
+            return false;
+        }
+
+        private static bool ScreenPointToRayMono(Camera __instance, Vector3 pos, ref Ray __result)
+        {
+            return ScreenPointToRay(__instance, pos, Camera.MonoOrStereoscopicEye.Mono, ref __result);
+        }
+
+        private static bool ScreenPointToRay(Camera __instance, Vector3 pos, Camera.MonoOrStereoscopicEye eye, ref Ray __result)
+        {
+            if (!MarkerAlignment.Applies(__instance, eye)) return true;
+            __result = MarkerAlignment.ScreenToRay(__instance, pos);
             return false;
         }
     }

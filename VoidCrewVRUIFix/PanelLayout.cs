@@ -36,25 +36,26 @@ namespace VoidCrewVRUIFix
     }
 
     /// <summary>
-    /// Re-projects Camera.WorldToViewportPoint for the player's camera onto the VR UI panel. Void Crew positions every
-    /// ping, objective marker and interaction prompt with that call, so this keeps them on top of the objects they
-    /// belong to, whatever size the panel is.
+    /// Re-projects the player camera's screen/world conversions onto the VR UI panel, in both directions.
+    /// World to screen: Void Crew places every ping, objective marker and interaction prompt with
+    /// WorldToViewportPoint/WorldToScreenPoint, so they sit on top of the objects they belong to.
+    /// Screen to world: in-world terminals aim the mouse with ScreenToWorldPoint (and world-space canvases with
+    /// ScreenPointToRay), so clicks land where the VR cursor appears on the panel.
+    /// Outside rendering the camera transform is the in-game view direction (UUVR only applies the head rotation
+    /// while a frame renders), which is exactly the frame the GameCamera-anchored panel is placed in.
     /// </summary>
     internal static class MarkerAlignment
     {
         public static Camera PlayerCamera;
         public static bool Active;
 
-        public static bool TryRemap(Camera camera, Vector3 worldPosition, Camera.MonoOrStereoscopicEye eye, out Vector3 viewport)
+        public static bool Applies(Camera camera, Camera.MonoOrStereoscopicEye eye)
         {
-            viewport = default(Vector3);
-            if (!Active || eye != Camera.MonoOrStereoscopicEye.Mono || !ReferenceEquals(camera, PlayerCamera) || camera == null)
-            {
-                return false;
-            }
+            return Active && eye == Camera.MonoOrStereoscopicEye.Mono && ReferenceEquals(camera, PlayerCamera) && camera != null;
+        }
 
-            // Outside rendering the camera transform is the in-game view direction (UUVR only applies head rotation
-            // while the frame renders), which is exactly the frame the GameCamera-anchored panel is placed in.
+        public static Vector3 WorldToViewport(Camera camera, Vector3 worldPosition)
+        {
             Transform t = camera.transform;
             Vector3 local = Quaternion.Inverse(t.rotation) * (worldPosition - t.position);
             float z = local.z;
@@ -62,11 +63,40 @@ namespace VoidCrewVRUIFix
 
             float tanX = local.x / z;
             float tanY = local.y / z - PanelLayout.HeightOffset / PanelLayout.Distance;
-            viewport = new Vector3(
+            return new Vector3(
                 0.5f + tanX / (2f * PanelLayout.TanHalfWidth),
                 0.5f + tanY / (2f * PanelLayout.TanHalfHeight),
                 local.z);
-            return true;
+        }
+
+        public static Vector3 WorldToScreen(Camera camera, Vector3 worldPosition)
+        {
+            Vector3 viewport = WorldToViewport(camera, worldPosition);
+            return new Vector3(viewport.x * Screen.width, viewport.y * Screen.height, viewport.z);
+        }
+
+        /// <summary>Like Camera.ScreenToWorldPoint: screen.z is the distance in front of the camera.</summary>
+        public static Vector3 ScreenToWorld(Camera camera, Vector3 screen)
+        {
+            Transform t = camera.transform;
+            return t.position + t.rotation * (ScreenDirection(screen) * screen.z);
+        }
+
+        /// <summary>Like Camera.ScreenPointToRay: starts on the near plane and points through the screen position.</summary>
+        public static Ray ScreenToRay(Camera camera, Vector3 screen)
+        {
+            Transform t = camera.transform;
+            Vector3 direction = t.rotation * ScreenDirection(screen);
+            return new Ray(t.position + direction * camera.nearClipPlane, direction.normalized);
+        }
+
+        /// <summary>Camera-local direction (z = 1) through a screen position on the panel.</summary>
+        private static Vector3 ScreenDirection(Vector3 screen)
+        {
+            float tanX = (screen.x / Mathf.Max(1, Screen.width) * 2f - 1f) * PanelLayout.TanHalfWidth;
+            float tanY = (screen.y / Mathf.Max(1, Screen.height) * 2f - 1f) * PanelLayout.TanHalfHeight
+                         + PanelLayout.HeightOffset / PanelLayout.Distance;
+            return new Vector3(tanX, tanY, 1f);
         }
     }
 }
