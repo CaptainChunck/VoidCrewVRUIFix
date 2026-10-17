@@ -47,16 +47,22 @@ namespace VoidCrewVRUIFix
                               XRSettings.eyeTextureHeight + ", desktop shows VR view " + XRSettings.showDeviceView);
             Line(report, "UUVR", UuvrCompat.Installed
                 ? UuvrCompat.Version + ", VR API " + UuvrCompat.VrApi + ", camera tracking " + UuvrCompat.CameraTracking + ", UUVR UI mode " + UuvrCompat.UiPatchMode +
-                  " | UI handling turned off " + UuvrCompat.DisabledUiManagers + "x, helper cameras disabled " + UuvrCompat.DisabledHelperCameras
+                  " | UI handling turned off " + UuvrCompat.DisabledUiManagers + "x, helper cameras disabled " + UuvrCompat.DisabledHelperCameras + " (" + UuvrCompat.Mode + ")"
                 : "not installed");
             Line(report, "Game state", GameStateName());
 
             Section(report, "Performance");
             Line(report, "Game", (1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f)).ToString("0") + " FPS (" + (Time.smoothDeltaTime * 1000f).ToString("0.0") +
-                                " ms per frame) | V-Sync " + QualitySettings.vSyncCount + ", frame limit " +
-                                (Application.targetFrameRate > 0 ? Application.targetFrameRate.ToString() : "none") +
-                                " | VR render scale " + XRSettings.eyeTextureResolutionScale.ToString("0.00"));
+                                " ms per frame) | VR render scale " + XRSettings.eyeTextureResolutionScale.ToString("0.00"));
+            Line(report, "Monitor sync", VrPerformance.DescribeMonitorSync());
+            Line(report, "Monitor picture", (runtime.PictureShown ? "on" : "off (window left black)") + " | setting " + (Settings.DesktopViewOn.Value ? "on" : "off") +
+                                           ", hotkey " + Settings.KeyDesktopView.Value + ", headset " + HeadsetPresence.Describe() +
+                                           (Settings.DesktopViewWhenHeadsetOff.Value ? " (picture comes back while it is off)" : ""));
             if (XrState.IsActive && XrState.IsOpenVr) Line(report, "SteamVR", SteamVrTimingReport());
+            if (XrState.IsActive) Line(report, "Stereo", (SinglePassStereo.DescribeMode(runtime.MainCamera) ?? "no running VR display") +
+                                                         (Settings.SinglePassStereo.Value ? "" : " (single-pass is off in the VR tab)") +
+                                                         (SinglePassStereo.Problem != null ? ", problem: " + SinglePassStereo.Problem : ""));
+            Line(report, "HDRP VR", VrPerformance.DescribeHdrpXr(runtime.MainCamera));
             Line(report, "DLSS", Settings.DisableDlss.Value ? "removed from the options (VR tab > Allow DLSS is off)" : "allowed, " + DlssEyes.Describe());
 
             Section(report, "VR UI");

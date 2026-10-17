@@ -37,6 +37,12 @@ namespace VoidCrewVRUIFix
         public static bool Active { get; private set; }
         public static int RenumberedPasses { get; private set; }
 
+        /// <summary>True if DLSS upscaled the VR camera within the last <paramref name="frames"/> frames.</summary>
+        public static bool RanWithin(int frames)
+        {
+            return _runCamera != null && Time.frameCount - _runFrame <= frames;
+        }
+
         /// <summary>For the diagnostics report.</summary>
         public static string Describe()
         {

@@ -53,12 +53,20 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> DisableUuvrHelperCameras;
         public static ConfigEntry<DesktopViewMode> DesktopView;
         public static ConfigEntry<float> DesktopViewWidth;
+        public static ConfigEntry<float> DesktopViewHeight;
+        public static ConfigEntry<bool> DesktopViewOn;
+        public static ConfigEntry<bool> DesktopViewWhenHeadsetOff;
         public static ConfigEntry<bool> ClearDesktopEachFrame;
+
+        public static ConfigEntry<bool> MonitorVSyncOffInVr;
+        public static ConfigEntry<bool> DlssCameraJitter;
+        public static ConfigEntry<bool> SinglePassStereo;
 
         public static ConfigEntry<Key> KeyFlip;
         public static ConfigEntry<Key> KeyDisplayMode;
         public static ConfigEntry<Key> KeyRecenter;
         public static ConfigEntry<Key> KeyDiagnostics;
+        public static ConfigEntry<Key> KeyDesktopView;
 
         public static ConfigEntry<bool> ControlFromVrView;
 
@@ -129,8 +137,28 @@ namespace VoidCrewVRUIFix
             DesktopViewWidth = config.Bind("Fixes", "Desktop View Width (degrees)", 90f,
                 new ConfigDescription("How wide a view the game window shows in PanelView mode. Limited to what the headset renders.",
                     new AcceptableValueRange<float>(30f, 170f)));
+            DesktopViewHeight = config.Bind("Fixes", "Desktop View Height (degrees)", 0f,
+                new ConfigDescription("Aims the game window's view up (positive) or down (negative) in PanelView mode. At 0 the view is centred on the UI panel. " +
+                    "Aiming up moves the UI down the window.",
+                    new AcceptableValueRange<float>(-30f, 30f)));
+            DesktopViewOn = config.Bind("Fixes", "Desktop View On", true,
+                "Shows the game in the game window on your monitor while in VR. Off leaves the window black and saves a little graphics work. " +
+                "The Desktop View On/Off hotkey switches it.");
+            DesktopViewWhenHeadsetOff = config.Bind("Fixes", "Desktop View When Headset Is Off", true,
+                "While Desktop View On is off, shows the game on the monitor again whenever the headset is taken off (using its proximity sensor), " +
+                "and hides it again when the headset is put back on.");
             ClearDesktopEachFrame = config.Bind("Fixes", "Clear Desktop Each Frame", true,
                 "Clears the game window every frame. Stops old UI images being left behind as 'ghosts' or trails on the desktop.");
+
+            MonitorVSyncOffInVr = config.Bind("Performance", "Monitor V-Sync Off In VR", true,
+                "Turns off the monitor's V-Sync and the game's frame limit while VR is on, so they can't hold back the headset's frame rate " +
+                "(SteamVR paces the frames). The game's own settings come back when VR is turned off.");
+            DlssCameraJitter = config.Bind("Performance", "DLSS Camera Jitter", true,
+                "Gives DLSS the tiny per-frame camera jitter it needs to rebuild fine detail. HDRP turns jitter off in VR, which makes DLSS blurry. " +
+                "Only used while DLSS is running. Turn off if edges shimmer.");
+            SinglePassStereo = config.Bind("Performance", "Single-Pass Stereo (Experimental)", false,
+                "Draws both eyes in one pass instead of drawing the whole game twice, which can save a lot of CPU time. SteamVR (OpenVR) only, needs a restart. " +
+                "Very experimental: Void Crew was not built for it, so one eye may be black or some effects may look wrong. If so, turn it off and restart.");
 
             KeyFlip = config.Bind("Hotkeys", "Flip UI", Key.F6,
                 "Flips the VR UI panel upside down (use if it appears inverted). Set to None to disable.");
@@ -140,6 +168,8 @@ namespace VoidCrewVRUIFix
                 "Moves the UI panel back in front of you.");
             KeyDiagnostics = config.Bind("Hotkeys", "Write Diagnostics", Key.F9,
                 "Writes a detailed diagnostics report to the BepInEx log and saves a picture of the VR UI texture. Include both when reporting a problem.");
+            KeyDesktopView = config.Bind("Hotkeys", "Desktop View On/Off", Key.F11,
+                "Turns the game picture on your monitor on or off while in VR (Fixes > Desktop View On). Can also be changed in the VR tab.");
 
             ControlFromVrView = config.Bind("Testing", "Control From VR View", false,
                 "Testing only, for SteamVR's null driver (no headset). While SteamVR's VR View window is the focused window, pass your keyboard, " +
@@ -160,10 +190,16 @@ namespace VoidCrewVRUIFix
         {
             return string.Format(
                 "UI {0:0}° wide at {1:0.0} m (anchor {2}, height {3:0.00} m), display {4}, darken behind menus {5:0%}, cursor x{6:0.0}, " +
-                "game window {7} {8:0}° wide, DLSS {9}, control from VR View {10}",
+                "game window {7} {8} {9:0}° wide aimed {10:0}°, monitor V-Sync off in VR {11}, DLSS {12} (jitter {13}), single-pass {14}, control from VR View {15}",
                 PanelWidthDegrees.Value, PanelDistance.Value, Anchor.Value, PanelHeightOffset.Value, DisplayMode.Value,
-                MenuBackdropOpacity.Value, CursorScale.Value, DesktopView.Value, DesktopViewWidth.Value,
-                DisableDlss.Value ? "off" : "allowed", ControlFromVrView.Value ? "on" : "off");
+                MenuBackdropOpacity.Value, CursorScale.Value, DesktopViewOn.Value ? "on" : "off", DesktopView.Value, DesktopViewWidth.Value,
+                DesktopViewHeight.Value, OnOff(MonitorVSyncOffInVr.Value), DisableDlss.Value ? "off" : "allowed", OnOff(DlssCameraJitter.Value),
+                OnOff(SinglePassStereo.Value), OnOff(ControlFromVrView.Value));
+        }
+
+        private static string OnOff(bool on)
+        {
+            return on ? "on" : "off";
         }
 
         /// <summary>Updates values saved by older plugin versions whose defaults turned out to be wrong.</summary>

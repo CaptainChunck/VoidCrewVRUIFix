@@ -26,14 +26,15 @@ namespace VoidCrewVRUIFix
         public int LastDrawnFrame { get; private set; } = -1;
         public string Problem { get; private set; }
         public float ViewWidthDegrees { get; private set; }
+        public float ViewAimDegrees { get; private set; }
 
         /// <summary>Colour to fill the whole picture with behind the UI while a full-screen UI layer shows.</summary>
         public Color Fill;
 
         public string Describe()
         {
-            return string.Format("mode {0}, last drawn frame {1}, view {2:0}° wide, UI area x {3:0.00}-{4:0.00} y {5:0.00}-{6:0.00}{7}",
-                Settings.DesktopView.Value, LastDrawnFrame, ViewWidthDegrees, _uiRect.xMin, _uiRect.xMax, _uiRect.yMin, _uiRect.yMax,
+            return string.Format("mode {0}, last drawn frame {1}, view {2:0}° wide aimed {3:0.0}° up, UI area x {4:0.00}-{5:0.00} y {6:0.00}-{7:0.00}{8}",
+                Settings.DesktopView.Value, LastDrawnFrame, ViewWidthDegrees, ViewAimDegrees, _uiRect.xMin, _uiRect.xMax, _uiRect.yMin, _uiRect.yMax,
                 Problem != null ? ", problem: " + Problem : "");
         }
 
@@ -137,9 +138,17 @@ namespace VoidCrewVRUIFix
             Matrix4x4 projection = eye.projection;
 
             // A view direction with slope t (one metre ahead) lands at ndc = m00 * t - m02 across, m11 * t - m12 up.
-            // The widest view the eye image can supply on each axis:
+            // How far the eye image reaches in each direction:
             float maxX = Mathf.Min((1f + projection.m02) / projection.m00, (1f - projection.m02) / projection.m00);
-            float maxY = Mathf.Min((1f + projection.m12) / projection.m11, (1f - projection.m12) / projection.m11);
+            float maxUp = (1f + projection.m12) / projection.m11;
+            float maxDown = (1f - projection.m12) / projection.m11;
+
+            // The view is centred on the UI panel (which "UI screen height" can raise or lower), then aimed up or down by
+            // Desktop View Height. Otherwise a raised panel sits high in the window and its top is cut off when the
+            // view is narrowed to fit the panel.
+            float aim = PanelLayout.HeightOffset / PanelLayout.Distance + Mathf.Tan(Mathf.Clamp(Settings.DesktopViewHeight.Value, -30f, 30f) * Mathf.Deg2Rad);
+            aim = Mathf.Clamp(aim, -0.8f * maxDown, 0.8f * maxUp);
+            float maxY = Mathf.Min(maxUp - aim, maxDown + aim);
 
             float aspect = (float)_frame.width / _frame.height;
             float tanX = Mathf.Tan(Mathf.Clamp(Settings.DesktopViewWidth.Value, 30f, 170f) * 0.5f * Mathf.Deg2Rad);
@@ -148,11 +157,12 @@ namespace VoidCrewVRUIFix
             tanX *= fit;
             tanY *= fit;
             ViewWidthDegrees = 2f * Mathf.Atan(tanX) * Mathf.Rad2Deg;
+            ViewAimDegrees = Mathf.Atan(aim) * Mathf.Rad2Deg;
 
             float uMin = 0.5f + 0.5f * (projection.m00 * -tanX - projection.m02);
             float uMax = 0.5f + 0.5f * (projection.m00 * tanX - projection.m02);
-            float vMin = 0.5f + 0.5f * (projection.m11 * -tanY - projection.m12);
-            float vMax = 0.5f + 0.5f * (projection.m11 * tanY - projection.m12);
+            float vMin = 0.5f + 0.5f * (projection.m11 * (aim - tanY) - projection.m12);
+            float vMax = 0.5f + 0.5f * (projection.m11 * (aim + tanY) - projection.m12);
 
             // HDRP writes headset images top row first (the way the headset displays them), while Unity's textures
             // count rows from the bottom, so image height h is texture coordinate 1 - h.
@@ -161,7 +171,7 @@ namespace VoidCrewVRUIFix
                 Mathf.Max(0, eye.textureArraySlice), 0);
 
             // Where the UI panel sits within this view, so the UI lines up with the scene like it does in the headset.
-            float centre = PanelLayout.HeightOffset / PanelLayout.Distance / tanY;
+            float centre = (PanelLayout.HeightOffset / PanelLayout.Distance - aim) / tanY;
             float width = PanelLayout.TanHalfWidth / tanX;
             float height = PanelLayout.TanHalfHeight / tanY;
             _uiRect = Rect.MinMaxRect(0.5f - 0.5f * width, 0.5f + 0.5f * (centre - height), 0.5f + 0.5f * width, 0.5f + 0.5f * (centre + height));

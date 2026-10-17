@@ -3,6 +3,7 @@ using System.Collections;
 using BepInEx.Configuration;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using UnityEngine.XR;
 
 namespace VoidCrewVRUIFix
@@ -16,6 +17,9 @@ namespace VoidCrewVRUIFix
     {
         private const float MaintenanceInterval = 0.5f;
         private const float HealthCheckDelay = 5f;
+
+        // Camera-space HUD canvases are searched for every this many maintenance steps, and straight after a scene loads.
+        private const int CanvasScanEvery = 3;
 
         private readonly UiCapture _capture = new UiCapture();
         private readonly DesktopView _desktop = new DesktopView();
@@ -33,6 +37,11 @@ namespace VoidCrewVRUIFix
         private Quaternion _cameraRotation = Quaternion.identity;
         private static bool _quitting;
         private bool _displayModeChanged;
+        private int _maintenanceCount;
+        private bool _canvasScanDue = true;
+        private bool _pictureShown = true;
+        private bool _pictureForHeadsetOff;
+        private float _pictureOnAt;
 
         public UiCapture Capture { get { return _capture; } }
         public IUiDisplay Display { get { return _display; } }
@@ -41,24 +50,31 @@ namespace VoidCrewVRUIFix
         public CanvasMover Canvases { get { return _canvases; } }
         public DesktopView Desktop { get { return _desktop; } }
 
+        /// <summary>Whether the game window on the monitor shows the game right now.</summary>
+        public bool PictureShown { get { return _pictureShown; } }
+
         private void Awake()
         {
             _cursor = new CursorOverlay(transform);
             Application.quitting += () => _quitting = true;
             Settings.DisplayMode.SettingChanged += (sender, args) => _displayModeChanged = true;
+            Settings.DisableUuvrUi.SettingChanged += (sender, args) => UuvrCompat.RequestScan();
+            Settings.DisableUuvrHelperCameras.SettingChanged += (sender, args) => UuvrCompat.RequestScan();
+            SceneManager.sceneLoaded += (scene, mode) => _canvasScanDue = true;
 
             // Order inside each frame: headset image into the desktop picture, capture the UI, then put the UI on
-            // the desktop picture and send it to the headset display.
+            // the desktop picture and send it to the headset display. With the monitor picture off, the desktop
+            // picture is skipped and the window stays black.
             _capture.TextureCreated = texture => { if (_display != null) _display.SetTexture(texture); };
             _capture.FrameRendered = (context, camera) =>
             {
-                if (Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.DrawScene(context, camera);
+                if (_pictureShown && Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.DrawScene(context, camera);
             };
             _capture.AfterCapture = (commands, ui) =>
             {
                 _fill.Sample(commands, ui);
                 _desktop.Fill = _fill.Current;
-                if (Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.Composite(commands, ui);
+                if (_pictureShown && Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.Composite(commands, ui);
                 if (_display != null) _display.AppendSubmit(commands);
             };
         }
@@ -99,6 +115,9 @@ namespace VoidCrewVRUIFix
 
         private void Tick()
         {
+            // The VR tab can wait for a key press even while VR is off.
+            HotkeyCapture.Update();
+
             bool vrActive = XrState.IsActive;
             if (vrActive != _vrActive)
             {
@@ -107,8 +126,10 @@ namespace VoidCrewVRUIFix
             }
             if (!vrActive) return;
 
+            UpdateMonitorPicture();
+
             // Unity's own mirror is drawn over the screen-space UI, so it is only used when chosen explicitly.
-            bool unityMirror = Settings.DesktopView.Value == DesktopViewMode.HeadsetMirror;
+            bool unityMirror = _pictureShown && Settings.DesktopView.Value == DesktopViewMode.HeadsetMirror;
             if (XRSettings.showDeviceView != unityMirror) XRSettings.showDeviceView = unityMirror;
 
             if (Time.unscaledTime >= _nextMaintenance)
@@ -155,7 +176,8 @@ namespace VoidCrewVRUIFix
             if (!_vrActive) return;
             try
             {
-                if (Settings.ClearDesktopEachFrame.Value) ClearDesktop();
+                // With the monitor picture off nothing else draws to the window, so it is always cleared to black.
+                if (Settings.ClearDesktopEachFrame.Value || !_pictureShown) ClearDesktop();
 
                 // Captured before UUVR applies the head rotation for rendering, so this is the in-game view direction.
                 if (_mainCamera != null)
@@ -207,8 +229,12 @@ namespace VoidCrewVRUIFix
             _vrStartedAt = Time.unscaledTime;
             _nextMaintenance = 0f;
             _nextDisplayAttempt = 0f;
+            _canvasScanDue = true;
             _capture.Enabled = true;
-            Log.Info("VR started (" + XrState.DeviceName + "). Game window shows: " + Settings.DesktopView.Value + ".");
+            HeadsetPresence.Reset();
+            UuvrCompat.RequestScan();
+            Log.Info("VR started (" + XrState.DeviceName + "). Game window shows: " +
+                     (Settings.DesktopViewOn.Value ? Settings.DesktopView.Value.ToString() : "nothing (monitor picture off, " + Settings.KeyDesktopView.Value + " turns it on)") + ".");
             GamePatches.RefreshHardwareCursor();
         }
 
@@ -219,6 +245,10 @@ namespace VoidCrewVRUIFix
             StopDisplay(null);
             MarkerAlignment.Active = false;
             _vrViewInput.Shutdown();
+            HeadsetPresence.Reset();
+            _pictureShown = true;
+            _pictureForHeadsetOff = false;
+            VrPerformance.OnVrStopped();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;
@@ -237,18 +267,50 @@ namespace VoidCrewVRUIFix
             if (camera != _mainCamera)
             {
                 _mainCamera = camera;
+                _canvasScanDue = true;
                 if (camera != null) Log.Info("Player camera is now '" + camera.name + "'.");
                 else Log.Verbose("No player camera right now (loading?).");
             }
 
-            _canvases.Scan();
+            if (_canvasScanDue || ++_maintenanceCount % CanvasScanEvery == 0)
+            {
+                _canvasScanDue = false;
+                _canvases.Scan();
+            }
             HdrpTweaks.DisableDlssOnCameras(_mainCamera);
+            VrPerformance.Maintain();
+            SinglePassStereo.ReportOnce(_mainCamera);
+        }
+
+        /// <summary>
+        /// The monitor picture is on when the setting says so, or while the headset is taken off (if that option is on).
+        /// </summary>
+        private void UpdateMonitorPicture()
+        {
+            HeadsetPresence.Update();
+            bool forHeadsetOff = !Settings.DesktopViewOn.Value && Settings.DesktopViewWhenHeadsetOff.Value && HeadsetPresence.Removed;
+            if (forHeadsetOff != _pictureForHeadsetOff)
+            {
+                _pictureForHeadsetOff = forHeadsetOff;
+                if (forHeadsetOff) Log.Info("Headset taken off: the game shows on the monitor until it is put back on.");
+                else if (!HeadsetPresence.Removed && !Settings.DesktopViewOn.Value) Log.Info("Headset back on: the monitor picture is off again.");
+            }
+
+            bool shown = Settings.DesktopViewOn.Value || forHeadsetOff;
+            if (shown && !_pictureShown) _pictureOnAt = Time.unscaledTime;
+            _pictureShown = shown;
         }
 
         private void StartDisplay()
         {
             _nextDisplayAttempt = Time.unscaledTime + 5f;
             UiDisplayMode mode = Settings.DisplayMode.Value;
+            if (mode == UiDisplayMode.InGamePanel && SinglePassStereo.Requested)
+            {
+                // The in-game panel is drawn like a single-eye image, so with single-pass stereo it would show in one eye only.
+                Log.WarnOnce("single-pass-panel", "With single-pass stereo the UI can't be drawn into the game image; the SteamVR overlay is used instead.");
+                mode = UiDisplayMode.SteamVROverlay;
+            }
 
             if (mode != UiDisplayMode.InGamePanel)
             {
@@ -306,6 +368,16 @@ namespace VoidCrewVRUIFix
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null) return;
 
+            // While the VR tab waits for a new hotkey, or in the frame it got one, keys are not hotkeys.
+            if (HotkeyCapture.Waiting || HotkeyCapture.CapturedFrame == Time.frameCount) return;
+
+            if (Pressed(keyboard, Settings.KeyDesktopView))
+            {
+                Settings.DesktopViewOn.Value = !Settings.DesktopViewOn.Value;
+                Log.Info("[" + Settings.KeyDesktopView.Value + "] Game picture on the monitor turned " + (Settings.DesktopViewOn.Value ? "on" : "off") +
+                         " (saved to the config).");
+            }
+
             if (Pressed(keyboard, Settings.KeyRecenter))
             {
                 if (_display != null) _display.Recenter();
@@ -359,7 +431,8 @@ namespace VoidCrewVRUIFix
             string problem = _display != null ? _display.CheckHealth() : null;
             if (problem != null) Log.WarnOnce("health-" + _display.Name, problem);
 
-            if (Settings.DesktopView.Value == DesktopViewMode.PanelView && _desktop.LastDrawnFrame < Time.frameCount - 120)
+            if (_pictureShown && Time.unscaledTime - _pictureOnAt > HealthCheckDelay &&
+                Settings.DesktopView.Value == DesktopViewMode.PanelView && _desktop.LastDrawnFrame < Time.frameCount - 120)
             {
                 Log.WarnOnce("health-desktop", "The game window isn't showing the VR view (" + (_desktop.Problem ?? "unknown reason") +
                                                "). Set 'Desktop View' to HeadsetMirror in the config as a workaround, and press F9 for a bug report.");

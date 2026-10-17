@@ -25,10 +25,17 @@ namespace VoidCrewVRUIFix
         private static Type _configType;
         private static object _config;
 
+        // Set once UUVR's UI manager and camera start-up are hooked; the scene is then only searched once per VR start.
+        private static bool _hooked;
+        private static bool _scanPending = true;
+
         public static bool Installed { get; private set; }
         public static string Version { get; private set; } = "not installed";
         public static int DisabledUiManagers { get; private set; }
         public static int DisabledHelperCameras { get; private set; }
+
+        /// <summary>Where UUVR's pieces are turned off from, for the diagnostics report.</summary>
+        public static string Mode { get { return _hooked ? "hooked into UUVR's start-up" : "searching the scene twice a second"; } }
 
         public static string VrApi { get { return GetSetting("PreferredVrApi") ?? "?"; } }
         public static string CameraTracking { get { return GetSetting("CameraTracking") ?? "?"; } }
@@ -116,42 +123,72 @@ namespace VoidCrewVRUIFix
             }
         }
 
-        /// <summary>Called a couple of times per second while VR is active. Cheap when there is nothing to do.</summary>
+        /// <summary>The plugin hooked UUVR's UI manager and VR camera start-up (see GamePatches).</summary>
+        public static void MarkHooked()
+        {
+            _hooked = true;
+        }
+
+        /// <summary>Searches the scene once more on the next maintenance (VR just started).</summary>
+        public static void RequestScan()
+        {
+            _scanPending = true;
+        }
+
+        /// <summary>
+        /// Called a couple of times per second while VR is active. With the start-up hooks in place this only searches
+        /// the scene once after VR starts, as a safety net; without them it searches every time.
+        /// </summary>
         public static void Maintain()
         {
             Resolve();
             if (!Installed) return;
+            if (_hooked && !_scanPending) return;
+            _scanPending = false;
 
             if (Settings.DisableUuvrUi.Value && _vrUiManagerType != null)
             {
                 foreach (UnityEngine.Object found in UnityEngine.Object.FindObjectsOfType(_vrUiManagerType))
                 {
-                    var component = found as Component;
-                    if (component == null || !component.gameObject.activeSelf) continue;
-
-                    // Deactivating the object runs UUVR's own OnDisable cleanup, which turns the desktop mirror back on
-                    // and stops its UI cameras, UI quad and software cursor.
-                    component.gameObject.SetActive(false);
-                    DisabledUiManagers++;
-                    Log.Info("Turned off UUVR's built-in UI handling (UI mode was '" + UiPatchMode + "'). This plugin draws the UI instead.");
-                    GamePatches.RefreshHardwareCursor();
+                    TurnOffUiManager(found as Component);
                 }
             }
 
-            if (Settings.DisableUuvrHelperCameras.Value && _childCameraField != null && CameraTracking == "RelativeTransform")
+            if (Settings.DisableUuvrHelperCameras.Value && _vrCameraType != null)
             {
                 foreach (UnityEngine.Object vrCamera in UnityEngine.Object.FindObjectsOfType(_vrCameraType))
                 {
-                    var helper = _childCameraField.GetValue(vrCamera) as Camera;
-                    if (helper == null || !helper.enabled) continue;
-
-                    // In RelativeTransform mode UUVR only reads this camera's transform, which keeps updating while disabled.
-                    helper.enabled = false;
-                    DisabledHelperCameras++;
-                    Log.Info("Disabled UUVR's tracking helper camera for '" + ((Component)vrCamera).name +
-                             "'. HDRP was rendering it as a full extra VR camera every frame.");
+                    DisableHelperCamera(vrCamera as Component);
                 }
             }
+        }
+
+        /// <summary>Turns off UUVR's own UI handling (a UUVR UI manager just started, or was found in the scene).</summary>
+        public static void TurnOffUiManager(Component manager)
+        {
+            if (manager == null || !Settings.DisableUuvrUi.Value || !manager.gameObject.activeSelf) return;
+
+            // Deactivating the object runs UUVR's own OnDisable cleanup, which turns the desktop mirror back on
+            // and stops its UI cameras, UI quad and software cursor.
+            manager.gameObject.SetActive(false);
+            DisabledUiManagers++;
+            Log.Info("Turned off UUVR's built-in UI handling (UI mode was '" + UiPatchMode + "'). This plugin draws the UI instead.");
+            GamePatches.RefreshHardwareCursor();
+        }
+
+        /// <summary>Disables a UUVR VR camera's tracking helper camera (it just started, or was found in the scene).</summary>
+        public static void DisableHelperCamera(Component vrCamera)
+        {
+            if (vrCamera == null || _childCameraField == null || !Settings.DisableUuvrHelperCameras.Value || CameraTracking != "RelativeTransform") return;
+
+            var helper = _childCameraField.GetValue(vrCamera) as Camera;
+            if (helper == null || !helper.enabled) return;
+
+            // In RelativeTransform mode UUVR only reads this camera's transform, which keeps updating while disabled.
+            helper.enabled = false;
+            DisabledHelperCameras++;
+            Log.Info("Disabled UUVR's tracking helper camera for '" + vrCamera.name +
+                     "'. HDRP was rendering it as a full extra VR camera every frame.");
         }
 
         /// <summary>Cameras UUVR creates for itself. They must never be picked as the player's camera.</summary>

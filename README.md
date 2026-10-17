@@ -109,6 +109,7 @@ BepInEx
 | **F7** | Switch between the SteamVR overlay and the in-game panel |
 | **F6** | Flip the UI panel, if it ever appears upside down |
 | **F9** | Write a diagnostics report to the log and save a picture of the VR UI (for bug reports) |
+| **F11** | Turn the game picture on your monitor on or off while you play in VR |
 | **F3** | Turn VR on or off (this one comes from UUVR) |
 
 You can change all of these in the settings.
@@ -137,8 +138,14 @@ The easiest way to change the VR settings is in the game itself: open **Settings
 | Darken world behind menus | Puts a dark layer over the world while a menu or terminal is open, to make text easier to read. Off by default |
 | VR mouse pointer size | Size of the mouse pointer on the UI screen |
 | Keep horizon level (UUVR) | The game only turns you left and right; you look up and down with your head |
-| Monitor window shows, view width | What the game window on your monitor shows while you play in VR, and how much of the view |
+| Show game on monitor | Turns the game picture on your monitor on or off while you play in VR. Off leaves the window black |
+| Show game on monitor key | The key for that (F11). Click it, then press the key you want |
+| Show game on monitor when headset is off | While the monitor picture is off, shows it again whenever you take the headset off, and hides it when you put the headset back on |
+| Monitor window shows, view width, view height | What the game window on your monitor shows while you play in VR, how much of the view, and where it is aimed. Set the view width to the UI screen size to make the UI fill the window |
+| Monitor V-Sync off in VR | Your monitor's V-Sync and the game's frame limit are turned off while VR is on, so they can't hold back the headset. On by default |
 | Allow DLSS (experimental, needs restart) | Puts DLSS back in Graphics > Upscaling. See [Frame rate in VR](#frame-rate-in-vr) |
+| Sharper DLSS (camera jitter) | Gives DLSS the camera jitter it needs for a sharp picture. On by default, only used while DLSS runs |
+| Single-pass stereo (experimental, needs restart) | Draws both eyes in one pass. SteamVR only, and may not work with Void Crew. See [Frame rate in VR](#frame-rate-in-vr) |
 | Testing: control from SteamVR VR View | Only for testing without a headset (SteamVR's null driver). Leave it off with a real headset |
 
 <!-- SCREENSHOT: docs/images/vr-settings-tab.png (the VR tab in the game's Settings menu)
@@ -162,6 +169,13 @@ Edit it with any text editor while the game is closed, or change settings live w
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
 | Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (what the headset shows, with the UI panel and cursor where they appear in VR), `HeadsetMirror` (Unity's zoomed mirror, no UI) or `UiOnly` |
 | Fixes → Desktop View Width (degrees) | 90 | How wide a view the game window shows in `PanelView` |
+| Fixes → Desktop View Height (degrees) | 0 | Aims the game window's view up or down in `PanelView`. At 0 it is centred on the UI panel |
+| Fixes → Desktop View On | true | Shows the game on your monitor while in VR. `false` leaves the window black |
+| Fixes → Desktop View When Headset Is Off | true | Shows the game on the monitor while the headset is taken off, even when Desktop View On is `false` |
+| Hotkeys → Desktop View On/Off | F11 | Switches Desktop View On |
+| Performance → Monitor V-Sync Off In VR | true | Turns off the monitor's V-Sync and the game's frame limit while VR is on, and puts them back afterwards |
+| Performance → DLSS Camera Jitter | true | Gives DLSS camera jitter in VR, for a sharper picture |
+| Performance → Single-Pass Stereo (Experimental) | false | Draws both eyes in one pass (SteamVR only, needs a restart) |
 | Testing → Control From VR View | false | Testing only, for SteamVR's null driver (no headset): while SteamVR's VR View window is focused, your keyboard and mouse still control the game. Typing into text boxes and the scroll wheel aren't passed through |
 
 Every setting has a description in the file.
@@ -173,8 +187,16 @@ SteamVR shows a new picture on every refresh of the headset, for example 90 time
 - **Lower SteamVR's render resolution:** in SteamVR's settings, open **Video** and set **Render Resolution** to Custom 100% or lower. Each step down makes every frame cheaper to draw.
 - **Use DLSS** (NVIDIA RTX cards): turn on **Allow DLSS** in the VR tab, restart the game, then choose **DLSS** under Graphics > Upscaling. Its Performance and Ultra Performance modes give the biggest gain.
 - **Lower the game's graphics settings**, like shadows and volumetric lighting.
+- **Turn off the monitor picture** with **F11** (or **Show game on monitor** in the VR tab) when nobody needs to watch. It saves drawing the game window: a small gain, a few percent at most. With **Show game on monitor when headset is off** on, the picture comes back by itself while the headset is off.
+- **Try single-pass stereo** (experimental): turn on **Single-pass stereo** in the VR tab and restart. HDRP then draws both eyes in one pass instead of drawing the whole game twice, which saves a lot of processor time. Void Crew wasn't built for VR, so this may not work: if one eye is black or effects look wrong, turn it off and restart.
 
-Press **F9** in game to check: the **Performance** section of the report shows how long the GPU takes per frame, how often SteamVR repeats each frame, and whether DLSS is running and at what resolution.
+The plugin also does these by itself while you play in VR:
+
+- Turns off your monitor's V-Sync and the game's frame limit, so a 60 Hz monitor can't hold back a 90 Hz headset. They come back when VR is turned off.
+- Gives DLSS the camera jitter it needs for a sharp picture (HDRP leaves it out in VR).
+- Makes sure HDRP skips the pixels the headset's lenses can't show (the hidden-area mask).
+
+Press **F9** in game to check: the **Performance** section of the report shows how long the GPU takes per frame, how often SteamVR repeats each frame, whether the monitor's V-Sync is off, whether the eyes are drawn in one pass or two, whether the hidden-area mask is used, and whether DLSS is running and at what resolution.
 
 ## Reporting a problem
 
@@ -209,7 +231,8 @@ Delete `VoidCrewVRUIFix.dll` from the `BepInEx\plugins` folder. To remove VR com
 - **UI capture:** while VR is on, after the game's renderer (HDRP) finishes each frame, the plugin asks Unity to draw all screen-space UI (UI Toolkit panels and uGUI canvases) once more into a texture that is cleared every frame.
 - **Display:** the texture goes to the headset as a SteamVR overlay (OpenVR) or as a quad drawn by an HDRP custom pass after post-processing (OpenXR).
 - **Markers:** `Camera.WorldToViewportPoint` is re-projected for the player camera so markers land in the right place on the panel.
-- **UUVR:** the plugin talks to UUVR only through reflection, so a UUVR update can't stop it from loading.
+- **UUVR:** the plugin talks to UUVR only through reflection, so a UUVR update can't stop it from loading. UUVR's own UI handling and its hidden helper cameras are switched off as they start, through Harmony hooks on UUVR's start-up.
+- **Single-pass stereo:** just before UUVR starts SteamVR, the plugin hands SteamVR's Unity plugin the same settings as UUVR's `OpenVRSettings.asset`, with only the stereo mode changed. No files are modified.
 
 ## Credits
 

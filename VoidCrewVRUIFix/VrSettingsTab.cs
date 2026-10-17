@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using CG.Client;
 using HarmonyLib;
 using UI;
@@ -223,19 +224,49 @@ namespace VoidCrewVRUIFix
                 "A UUVR setting. On: the game only turns you left and right, and you look up and down with your head, which some people find more comfortable. " +
                 "Off (default): the mouse tilts the view up and down as usual.",
                 () => UuvrCompat.GetSetting("AlignCameraToHorizon") == "True", on => UuvrCompat.SetSetting("AlignCameraToHorizon", on ? "True" : "False"));
+            AddToggle(rows, refreshers, "SHOW GAME ON MONITOR",
+                "Shows the game in the game window on your monitor while you play in VR (default on). Off leaves the window black and skips drawing it, " +
+                "which saves a little graphics work: a small frame-rate gain, not a big one. The key below switches it too.",
+                () => Settings.DesktopViewOn.Value, on => Settings.DesktopViewOn.Value = on);
+            AddKey(rows, refreshers, "SHOW GAME ON MONITOR KEY",
+                "The key that turns the game picture on your monitor on and off while you play in VR (default F11). Click, then press the key you want. " +
+                "Backspace or Delete removes the key, Escape cancels.",
+                Settings.KeyDesktopView);
+            AddToggle(rows, refreshers, "SHOW GAME ON MONITOR WHEN HEADSET IS OFF",
+                "When the monitor picture is off, shows it again while the headset is taken off (using the headset's proximity sensor), " +
+                "and turns it off again when you put the headset back on (default on).",
+                () => Settings.DesktopViewWhenHeadsetOff.Value, on => Settings.DesktopViewWhenHeadsetOff.Value = on);
             AddDropdown(rows, refreshers, "MONITOR WINDOW SHOWS",
                 "What the game window on your monitor shows while you play in VR. Headset view with UI: what you see in the headset, menus included (default). " +
                 "Headset view, no UI: Unity's plain mirror of one eye. UI only: just the menus and HUD on black.",
                 new[] { "Headset view with UI", "Headset view, no UI", "UI only" },
                 () => (int)Settings.DesktopView.Value, choice => Settings.DesktopView.Value = (DesktopViewMode)choice);
             AddSlider(rows, refreshers, "MONITOR WINDOW VIEW WIDTH",
-                "How much of the headset view the monitor window shows when it shows the headset view with UI (default 90). Lower zooms in; higher shows more around the edges.",
+                "How much of the headset view the monitor window shows when it shows the headset view with UI (default 90). Lower zooms in; higher shows more around the edges. " +
+                "Set it to the UI screen size to make the UI fill the window.",
                 30f, 170f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
                 () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "MONITOR WINDOW VIEW HEIGHT",
+                "Aims the monitor window's view up or down (default 0, centred on the UI screen). Higher shows more of what's above the UI and moves the UI down the window; " +
+                "lower does the opposite.",
+                -30f, 30f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.DesktopViewHeight.Value, v => Settings.DesktopViewHeight.Value = Mathf.Round(v));
+            AddToggle(rows, refreshers, "MONITOR V-SYNC OFF IN VR",
+                "Turns off the monitor's V-Sync and the game's frame limit while you play in VR, so your monitor's refresh rate can never hold back the headset. " +
+                "SteamVR paces the frames instead. Your own settings come back when VR is turned off (default on).",
+                () => Settings.MonitorVSyncOffInVr.Value, on => Settings.MonitorVSyncOffInVr.Value = on);
             AddToggle(rows, refreshers, "ALLOW DLSS (EXPERIMENTAL, NEEDS RESTART)",
                 "Puts DLSS back in Graphics > Upscaling. DLSS renders the game at a lower resolution and upscales it, which can raise the frame rate on NVIDIA RTX cards. " +
                 "It's experimental in VR. Restart the game after turning this on, then choose DLSS under Graphics > Upscaling.",
                 () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
+            AddToggle(rows, refreshers, "SHARPER DLSS (CAMERA JITTER)",
+                "Gives DLSS the tiny per-frame camera jitter it needs to rebuild fine detail. HDRP leaves jitter out in VR, which makes DLSS blurry. " +
+                "Only used while DLSS is running (default on). Turn it off if edges shimmer.",
+                () => Settings.DlssCameraJitter.Value, on => Settings.DlssCameraJitter.Value = on);
+            AddToggle(rows, refreshers, "SINGLE-PASS STEREO (EXPERIMENTAL, NEEDS RESTART)",
+                "Draws both eyes in one pass instead of drawing the whole game twice, which can save a lot of processor time. SteamVR (OpenVR) only. " +
+                "Very experimental: Void Crew wasn't built for VR, so one eye may be black or some effects may look wrong. If so, turn this off and restart the game.",
+                () => Settings.SinglePassStereo.Value, on => Settings.SinglePassStereo.Value = on);
             AddToggle(rows, refreshers, "TESTING: CONTROL FROM STEAMVR VR VIEW",
                 "Only for testing without a headset, using SteamVR's null driver. While SteamVR's VR View window is the focused window, your keyboard and mouse are passed to the game. " +
                 "Leave this off when you play with a real headset.",
@@ -307,6 +338,86 @@ namespace VoidCrewVRUIFix
                 row.Reload();
             });
             rows.Add(row);
+        }
+
+        private static void AddKey(VisualElement rows, List<Action> refreshers, string label, string help, ConfigEntry<UnityEngine.InputSystem.Key> entry)
+        {
+            var row = new KeyRow();
+            Prepare(row, label, help);
+            row.KeyText = HotkeyCapture.KeyName(entry.Value);
+
+            int lastClick = -1;
+            row.Clicked += () =>
+            {
+                // One click can reach the button twice (the row passes its clicks on to the button).
+                if (Time.frameCount == lastClick) return;
+                lastClick = Time.frameCount;
+                if (HotkeyCapture.IsWaitingFor(entry))
+                {
+                    HotkeyCapture.Cancel();
+                    return;
+                }
+                row.KeyText = "PRESS A KEY";
+                HotkeyCapture.Begin(entry, () => row.KeyText = HotkeyCapture.KeyName(entry.Value), () => IsShowing(row));
+            };
+            refreshers.Add(() =>
+            {
+                if (!HotkeyCapture.IsWaitingFor(entry)) row.KeyText = HotkeyCapture.KeyName(entry.Value);
+            });
+            rows.Add(row);
+        }
+
+        /// <summary>False once the element's menu is closed or another tab is showing.</summary>
+        private static bool IsShowing(VisualElement element)
+        {
+            if (element.panel == null) return false;
+            for (VisualElement e = element; e != null; e = e.hierarchy.parent)
+            {
+                IResolvedStyle style = e.resolvedStyle;
+                if (style.display == DisplayStyle.None || style.visibility == Visibility.Hidden || style.opacity < 0.01f) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// A setting row with a key button, built the same way as the game's own key-binding rows. Clicking it waits for
+        /// the next key press (see HotkeyCapture) instead of opening the game's rebinding popup.
+        /// </summary>
+        private sealed class KeyRow : SettingEntryVE
+        {
+            private Button _keyButton;
+
+            public event Action Clicked;
+
+            public string KeyText
+            {
+                set { if (_keyButton != null) _keyButton.text = value; }
+            }
+
+            // Called by the base constructor.
+            protected override void SetupContainers()
+            {
+                base.SetupContainers();
+                AddToClassList("settings-entry-type__key-bind");
+                _keyButton = VEFactoryHelper.SetupVE<Button>(inputContainer, "KeyBindButton", "settings-key-bind");
+                UIAudioProvider.AddSound(_keyButton, UIAudioEventRef.ESoundType.Click, "list");
+                UIAudioProvider.AddSound(_keyButton, UIAudioEventRef.ESoundType.Hover, "list");
+                inputContainer.Insert(1, _keyButton);
+                _keyButton.clicked += () =>
+                {
+                    Action clicked = Clicked;
+                    if (clicked != null) clicked();
+                };
+                activeElement = _keyButton;
+            }
+
+            public override void Init(ISetting setting)
+            {
+            }
+
+            public override void Reload()
+            {
+            }
         }
 
         private static void Prepare(SettingEntryVE row, string label, string help)

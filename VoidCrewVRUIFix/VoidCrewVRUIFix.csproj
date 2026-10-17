@@ -123,6 +123,8 @@
     <Compile Include="FullscreenFill.cs" />
     <Compile Include="GamePatches.cs" />
     <Compile Include="HdrpTweaks.cs" />
+    <Compile Include="HeadsetPresence.cs" />
+    <Compile Include="HotkeyCapture.cs" />
     <Compile Include="InGamePanelDisplay.cs" />
     <Compile Include="IntroVideo.cs" />
     <Compile Include="Log.cs" />
@@ -131,6 +133,7 @@
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Settings.cs" />
+    <Compile Include="SinglePassStereo.cs" />
     <Compile Include="SteamVrOverlayDisplay.cs" />
     <Compile Include="SteamVrTiming.cs" />
     <Compile Include="UiCapture.cs" />
@@ -139,6 +142,7 @@
     <Compile Include="VrUiRuntime.cs" />
     <Compile Include="VrSettingsTab.cs" />
     <Compile Include="VrViewInput.cs" />
+    <Compile Include="VrPerformance.cs" />
     <Compile Include="XrState.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -19,8 +19,11 @@ namespace VoidCrewVRUIFix
         private const string OverlayKey = "voidcrew.vruifix.ui";
         private const string FillKey = "voidcrew.vruifix.fill";
 
-        // The fill sits just behind the UI panel, locked to the head, and is wide enough to cover the whole view.
-        private const float FillExtraDistance = 0.25f;
+        // The fill is locked to the head and wide enough to cover the whole view. SteamVR draws overlays at their real
+        // depth, so it has to sit behind every part of the UI panel: when it sat just behind the panel's centre, it cut
+        // through the panel's far edge as soon as you looked to the side (a dark box over the edge of the menus).
+        // It now sits behind the panel's farthest corner, with this much room for leaning.
+        private const float FillHeadroom = 1f;
         private const float FillHalfAngle = 80f;
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -54,7 +57,6 @@ namespace VoidCrewVRUIFix
         private Color _fillColour;
         private float _appliedFillAlpha = -1f;
         private float _appliedFillDistance = -1f;
-        private float _appliedFillHeight = float.NaN;
         private bool _needsRecenter = true;
         private Vector3 _center;
         private ETrackingUniverseOrigin _origin = ETrackingUniverseOrigin.TrackingUniverseStanding;
@@ -108,10 +110,11 @@ namespace VoidCrewVRUIFix
             get
             {
                 return string.Format(
-                    "handle 0x{0:X}, shown {1}, tracking space {2}, centre {3}, frames submitted {4} ({5}), last SteamVR error {6}{7}",
+                    "handle 0x{0:X}, shown {1}, tracking space {2}, centre {3}, frames submitted {4} ({5}), last SteamVR error {6}, background fill {7}{8}",
                     _handle, _shown, _origin, _center, Interlocked.Read(ref _submitCount),
                     Settings.SubmitOverlayOnRenderThread.Value ? "render thread" : "main thread",
                     (EVROverlayError)_submitError,
+                    _fillShown ? "shown " + _appliedFillDistance.ToString("0.0") + " m away" : "hidden",
                     _submitException != null ? ", last exception " + _submitException : "");
             }
         }
@@ -229,17 +232,15 @@ namespace VoidCrewVRUIFix
             bool show = fill.a > 0.003f;
             if (show)
             {
-                float distance = PanelLayout.Distance + FillExtraDistance;
-                float height = PanelLayout.HeightOffset;
-                if (distance != _appliedFillDistance || height != _appliedFillHeight)
+                float distance = FillDistance();
+                if (Mathf.Abs(distance - _appliedFillDistance) > 0.001f)
                 {
-                    var transform = new HmdMatrix34_t { m0 = 1f, m5 = 1f, m10 = 1f, m7 = height, m11 = -distance };
+                    var transform = new HmdMatrix34_t { m0 = 1f, m5 = 1f, m10 = 1f, m11 = -distance };
                     Check(_overlay.SetOverlayTransformTrackedDeviceRelative(_fillHandle, OpenVR.k_unTrackedDeviceIndex_Hmd, ref transform),
                         "SetOverlayTransformTrackedDeviceRelative(fill)");
                     Check(_overlay.SetOverlayWidthInMeters(_fillHandle, 2f * distance * Mathf.Tan(FillHalfAngle * Mathf.Deg2Rad)),
                         "SetOverlayWidthInMeters(fill)");
                     _appliedFillDistance = distance;
-                    _appliedFillHeight = height;
                 }
                 if (Mathf.Abs(fill.a - _appliedFillAlpha) > 0.002f)
                 {
@@ -255,6 +256,15 @@ namespace VoidCrewVRUIFix
                 _fillShown = show;
                 lock (SubmitLock) _submitFillActive = show;
             }
+        }
+
+        /// <summary>How far in front of the eyes the fill sits: behind the panel's farthest corner, plus room for leaning.</summary>
+        private static float FillDistance()
+        {
+            float distance = PanelLayout.Distance;
+            float halfWidth = PanelLayout.WidthMeters * 0.5f;
+            float halfHeight = PanelLayout.HeightMeters * 0.5f + Mathf.Abs(PanelLayout.HeightOffset);
+            return Mathf.Sqrt(distance * distance + halfWidth * halfWidth + halfHeight * halfHeight) + FillHeadroom;
         }
 
         public void AppendSubmit(CommandBuffer commands)
