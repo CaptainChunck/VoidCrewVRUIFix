@@ -37,10 +37,10 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "Gameplay.Terminals.TerminalScreen", "DelayedParentWorldUiPanel", nameof(TerminalScreenEntered), null, "terminal screens", applied, skipped);
             Patch(harmony, "CG.Client.Ship.Modules.Mediators.TerminalModuleMediator", "DelayedParentWorldUiPanel", nameof(ShipTerminalEntered), null,
                 "ship terminal screens", applied, skipped);
+            Patch(harmony, "CG.Client.UI.Terminals.WorldSpaceUI", "TransformPointerEvent", nameof(TerminalScreenPointer), null, "terminal screen clicks", applied, skipped);
             // DLSS can only be picked when it is allowed, and changing that needs a restart.
             if (!Settings.DisableDlss.Value) PatchDlssEyes(harmony, applied, skipped);
             if (UuvrCompat.Installed) PatchUuvrStartup(harmony, applied, skipped);
-            if (UuvrCompat.Installed && Settings.SinglePassStereo.Value) PatchSinglePass(harmony, applied, skipped);
 
             // Both overloads of each are patched: the one-argument versions are small enough to be inlined into game code.
             Type[] mono = { typeof(Vector3) };
@@ -155,28 +155,6 @@ namespace VoidCrewVRUIFix
             if (applied.Count - before == 2) UuvrCompat.MarkHooked();
         }
 
-        private static void PatchSinglePass(Harmony harmony, List<string> applied, List<string> skipped)
-        {
-            MethodBase target;
-            try
-            {
-                target = SteamVrLoaderInitialize();
-            }
-            catch (Exception e)
-            {
-                skipped.Add("single-pass stereo (UUVR's SteamVR loader: " + e.GetType().Name + ": " + e.Message + ")");
-                return;
-            }
-            PatchMethod(harmony, target, nameof(BeforeSteamVrStarts), null, "single-pass stereo", applied, skipped);
-        }
-
-        // Kept separate: it loads UUVR's SteamVR assembly, which a caller without UUVR must be able to catch.
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static MethodBase SteamVrLoaderInitialize()
-        {
-            return AccessTools.DeclaredMethod(typeof(Unity.XR.OpenVR.OpenVRLoader), "Initialize");
-        }
-
         // These run inside UUVR's own start-up, so nothing may escape from them.
         private static void UuvrUiManagerStarted(MonoBehaviour __instance)
         {
@@ -200,11 +178,6 @@ namespace VoidCrewVRUIFix
             {
                 Log.Failure("Disabling UUVR's helper camera", e);
             }
-        }
-
-        private static void BeforeSteamVrStarts()
-        {
-            SinglePassStereo.BeforeSteamVrStarts();
         }
 
         private static bool HideDlss(ref bool __result)
@@ -258,6 +231,21 @@ namespace VoidCrewVRUIFix
             if (!TerminalScreens.Applies) return true;
             __result = TerminalScreens.EnterShipTerminal(__instance);
             return false;
+        }
+
+        // Mouse positions are mapped onto a terminal screen that isn't attached to the camera.
+        private static bool TerminalScreenPointer(MonoBehaviour __instance, UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (!TerminalScreens.Applies) return true;
+            try
+            {
+                return !TerminalScreens.TransformPointerEvent(__instance, eventData);
+            }
+            catch (Exception e)
+            {
+                Log.Failure("Mapping the mouse onto a terminal screen", e);
+                return true;
+            }
         }
 
         private static void RedirectIntroVideo(MonoBehaviour __instance)

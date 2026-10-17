@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using BepInEx.Configuration;
+using HarmonyLib;
 using UnityEngine.InputSystem;
 
 namespace VoidCrewVRUIFix
@@ -61,7 +64,7 @@ namespace VoidCrewVRUIFix
 
         public static ConfigEntry<bool> MonitorVSyncOffInVr;
         public static ConfigEntry<bool> DlssCameraJitter;
-        public static ConfigEntry<bool> SinglePassStereo;
+        public static ConfigEntry<bool> ShowFpsCounter;
 
         public static ConfigEntry<Key> KeyFlip;
         public static ConfigEntry<Key> KeyDisplayMode;
@@ -75,7 +78,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> VerboseLogging;
         private static ConfigEntry<int> _settingsVersion;
 
-        private const int CurrentSettingsVersion = 3;
+        private const int CurrentSettingsVersion = 4;
 
         public static void Bind(ConfigFile config)
         {
@@ -157,12 +160,12 @@ namespace VoidCrewVRUIFix
             MonitorVSyncOffInVr = config.Bind("Performance", "Monitor V-Sync Off In VR", true,
                 "Turns off the monitor's V-Sync and the game's frame limit while VR is on, so they can't hold back the headset's frame rate " +
                 "(SteamVR paces the frames). The game's own settings come back when VR is turned off.");
+            ShowFpsCounter = config.Bind("Performance", "FPS Counter In Headset", false,
+                "Shows the game's frame rate in the top left of your view in the headset. Green: the headset's full refresh rate. " +
+                "Yellow: half of it or more. Red: lower.");
             DlssCameraJitter = config.Bind("Performance", "DLSS Camera Jitter", true,
                 "Gives DLSS the tiny per-frame camera jitter it needs to rebuild fine detail. HDRP turns jitter off in VR, which makes DLSS blurry. " +
                 "Only used while DLSS is running. Turn off if edges shimmer.");
-            SinglePassStereo = config.Bind("Performance", "Single-Pass Stereo (Experimental)", false,
-                "Draws both eyes in one pass instead of drawing the whole game twice, which can save a lot of CPU time. SteamVR (OpenVR) only, needs a restart. " +
-                "Very experimental: Void Crew was not built for it, so one eye may be black or some effects may look wrong. If so, turn it off and restart.");
 
             KeyFlip = config.Bind("Hotkeys", "Flip UI", Key.F6,
                 "Flips the VR UI panel upside down (use if it appears inverted). Set to None to disable.");
@@ -186,7 +189,7 @@ namespace VoidCrewVRUIFix
 
             _settingsVersion = config.Bind("Debug", "Settings Version", 0,
                 "Used by the plugin to update settings saved by older versions. Don't change it.");
-            Migrate();
+            Migrate(config);
         }
 
         /// <summary>One line with the settings players change most, for the start-up log.</summary>
@@ -194,11 +197,11 @@ namespace VoidCrewVRUIFix
         {
             return string.Format(
                 "UI {0:0}° wide at {1:0.0} m (anchor {2}, height {3:0.00} m), display {4}, darken behind menus {5:0%}, cursor x{6:0.0}, " +
-                "game window {7} {8} {9:0}° wide aimed {10:0}°, monitor V-Sync off in VR {11}, DLSS {12} (jitter {13}), single-pass {14}, control from VR View {15}",
+                "game window {7} {8} {9:0}° wide aimed {10:0}°, monitor V-Sync off in VR {11}, DLSS {12} (jitter {13}), control from VR View {14}",
                 PanelWidthDegrees.Value, PanelDistance.Value, Anchor.Value, PanelHeightOffset.Value, DisplayMode.Value,
                 MenuBackdropOpacity.Value, CursorScale.Value, DesktopViewOn.Value ? "on" : "off", DesktopView.Value, DesktopViewWidth.Value,
                 DesktopViewHeight.Value, OnOff(MonitorVSyncOffInVr.Value), DisableDlss.Value ? "off" : "allowed", OnOff(DlssCameraJitter.Value),
-                OnOff(SinglePassStereo.Value), OnOff(ControlFromVrView.Value));
+                OnOff(ControlFromVrView.Value));
         }
 
         private static string OnOff(bool on)
@@ -207,7 +210,7 @@ namespace VoidCrewVRUIFix
         }
 
         /// <summary>Updates values saved by older plugin versions whose defaults turned out to be wrong.</summary>
-        private static void Migrate()
+        private static void Migrate(ConfigFile config)
         {
             int version = _settingsVersion.Value;
             if (version >= CurrentSettingsVersion) return;
@@ -225,7 +228,36 @@ namespace VoidCrewVRUIFix
                 MenuBackdropOpacity.Value = 0f;
                 Log.Info("Settings updated from an older version: Menu Backdrop Opacity 1 -> 0. At 100% the world behind menus was completely black.");
             }
+            if (version < 4)
+            {
+                // Single-pass stereo was tried in 3.8.0 and removed: the two eyes' views didn't turn together.
+                // The old desktop switch is from 3.0. BepInEx keeps unknown lines in the file, so they are tidied away here.
+                RemoveObsolete(config, new ConfigDefinition("Performance", "Single-Pass Stereo (Experimental)"),
+                    new ConfigDefinition("Fixes", "Show VR View On Desktop"));
+            }
             _settingsVersion.Value = CurrentSettingsVersion;
+        }
+
+        /// <summary>Removes lines for settings that no longer exist from the config file.</summary>
+        private static void RemoveObsolete(ConfigFile config, params ConfigDefinition[] keys)
+        {
+            try
+            {
+                var orphans = AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(config, null) as IDictionary<ConfigDefinition, string>;
+                if (orphans == null) return;
+                var removed = new List<string>();
+                foreach (ConfigDefinition key in keys)
+                {
+                    if (orphans.Remove(key)) removed.Add(key.Key);
+                }
+                if (removed.Count == 0) return;
+                config.Save();
+                Log.Info("Removed settings that no longer exist from the config file: " + string.Join(", ", removed.ToArray()) + ".");
+            }
+            catch (Exception e)
+            {
+                Log.Verbose("Could not remove old settings from the config file: " + e.Message);
+            }
         }
     }
 }

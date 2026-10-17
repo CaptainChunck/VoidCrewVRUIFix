@@ -14,6 +14,9 @@ namespace VoidCrewVRUIFix
 
         /// <summary>Colour to fill the rest of the view with while a full-screen UI layer shows; alpha 0 = none.</summary>
         public Color Fill;
+
+        /// <summary>The frame-rate counter's picture, shown locked to the head; null when it is turned off.</summary>
+        public Texture FpsTexture;
     }
 
     /// <summary>A way of showing the captured UI texture in the headset.</summary>

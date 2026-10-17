@@ -13,7 +13,7 @@ namespace VoidCrewVRUIFix
     {
         public const string Guid = "com.user.voidcrew.vruifix";
         public const string Name = "Void Crew VR UI Fix";
-        public const string Version = "3.8.1";
+        public const string Version = "3.9.0";
 
         private GameObject _runtime;
 

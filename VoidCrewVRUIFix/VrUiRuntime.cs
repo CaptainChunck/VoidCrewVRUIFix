@@ -24,6 +24,7 @@ namespace VoidCrewVRUIFix
         private readonly UiCapture _capture = new UiCapture();
         private readonly DesktopView _desktop = new DesktopView();
         private readonly FullscreenFill _fill = new FullscreenFill();
+        private readonly FpsCounter _fps = new FpsCounter();
         private readonly CanvasMover _canvases = new CanvasMover();
         private readonly VrViewInput _vrViewInput = new VrViewInput();
         private CursorOverlay _cursor;
@@ -49,6 +50,7 @@ namespace VoidCrewVRUIFix
         public CursorOverlay Cursor { get { return _cursor; } }
         public CanvasMover Canvases { get { return _canvases; } }
         public DesktopView Desktop { get { return _desktop; } }
+        public FpsCounter Fps { get { return _fps; } }
 
         /// <summary>Whether the game window on the monitor shows the game right now.</summary>
         public bool PictureShown { get { return _pictureShown; } }
@@ -98,6 +100,7 @@ namespace VoidCrewVRUIFix
             _capture.Release();
             _desktop.Release();
             _fill.Release();
+            _fps.Release();
         }
 
         private void Update()
@@ -127,6 +130,7 @@ namespace VoidCrewVRUIFix
             if (!vrActive) return;
 
             UpdateMonitorPicture();
+            _fps.Update(Settings.ShowFpsCounter.Value);
 
             // Unity's own mirror is drawn over the screen-space UI, so it is only used when chosen explicitly.
             bool unityMirror = _pictureShown && Settings.DesktopView.Value == DesktopViewMode.HeadsetMirror;
@@ -195,7 +199,8 @@ namespace VoidCrewVRUIFix
                         Camera = _mainCamera,
                         CameraPosition = _cameraPosition,
                         CameraRotation = _cameraRotation,
-                        Fill = _fill.Current
+                        Fill = _fill.Current,
+                        FpsTexture = _fps.Texture
                     });
                 }
             }
@@ -279,7 +284,6 @@ namespace VoidCrewVRUIFix
             }
             HdrpTweaks.DisableDlssOnCameras(_mainCamera);
             VrPerformance.Maintain();
-            SinglePassStereo.ReportOnce(_mainCamera);
         }
 
         /// <summary>
@@ -305,12 +309,6 @@ namespace VoidCrewVRUIFix
         {
             _nextDisplayAttempt = Time.unscaledTime + 5f;
             UiDisplayMode mode = Settings.DisplayMode.Value;
-            if (mode == UiDisplayMode.InGamePanel && SinglePassStereo.Requested)
-            {
-                // The in-game panel is drawn like a single-eye image, so with single-pass stereo it would show in one eye only.
-                Log.WarnOnce("single-pass-panel", "With single-pass stereo the UI can't be drawn into the game image; the SteamVR overlay is used instead.");
-                mode = UiDisplayMode.SteamVROverlay;
-            }
 
             if (mode != UiDisplayMode.InGamePanel)
             {

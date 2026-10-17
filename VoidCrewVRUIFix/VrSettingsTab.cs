@@ -251,6 +251,10 @@ namespace VoidCrewVRUIFix
                 "lower does the opposite.",
                 -30f, 30f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
                 () => Settings.DesktopViewHeight.Value, v => Settings.DesktopViewHeight.Value = Mathf.Round(v));
+            AddToggle(rows, refreshers, "FPS COUNTER IN HEADSET",
+                "Shows the game's frame rate in the top left of your view in the headset (default off). Green: the headset's full refresh rate. " +
+                "Yellow: half of it or more, so SteamVR is showing each frame twice. Red: lower than that.",
+                () => Settings.ShowFpsCounter.Value, on => Settings.ShowFpsCounter.Value = on);
             AddToggle(rows, refreshers, "MONITOR V-SYNC OFF IN VR",
                 "Turns off the monitor's V-Sync and the game's frame limit while you play in VR, so your monitor's refresh rate can never hold back the headset. " +
                 "SteamVR paces the frames instead. Your own settings come back when VR is turned off (default on).",
@@ -263,10 +267,6 @@ namespace VoidCrewVRUIFix
                 "Gives DLSS the tiny per-frame camera jitter it needs to rebuild fine detail. HDRP leaves jitter out in VR, which makes DLSS blurry. " +
                 "Only used while DLSS is running (default on). Turn it off if edges shimmer.",
                 () => Settings.DlssCameraJitter.Value, on => Settings.DlssCameraJitter.Value = on);
-            AddToggle(rows, refreshers, "SINGLE-PASS STEREO (EXPERIMENTAL, NEEDS RESTART)",
-                "Draws both eyes in one pass instead of drawing the whole game twice, which can save a lot of processor time. SteamVR (OpenVR) only. " +
-                "Very experimental: Void Crew wasn't built for VR, so one eye may be black or some effects may look wrong. If so, turn this off and restart the game.",
-                () => Settings.SinglePassStereo.Value, on => Settings.SinglePassStereo.Value = on);
             AddToggle(rows, refreshers, "TESTING: CONTROL FROM STEAMVR VR VIEW",
                 "Only for testing without a headset, using SteamVR's null driver. While SteamVR's VR View window is the focused window, your keyboard and mouse are passed to the game. " +
                 "Leave this off when you play with a real headset.",

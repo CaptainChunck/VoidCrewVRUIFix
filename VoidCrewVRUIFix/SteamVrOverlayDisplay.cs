@@ -18,6 +18,7 @@ namespace VoidCrewVRUIFix
     {
         private const string OverlayKey = "voidcrew.vruifix.ui";
         private const string FillKey = "voidcrew.vruifix.fill";
+        private const string FpsKey = "voidcrew.vruifix.fps";
 
         // The fill is locked to the head and wide enough to cover the whole view. SteamVR draws overlays at their real
         // depth, so it has to sit behind every part of the UI panel: when it sat just behind the panel's centre, it cut
@@ -37,6 +38,9 @@ namespace VoidCrewVRUIFix
         private static ulong _submitFillHandle;
         private static Texture_t _submitFillTexture;
         private static bool _submitFillActive;
+        private static ulong _submitFpsHandle;
+        private static Texture_t _submitFpsTexture;
+        private static bool _submitFpsActive;
         private static uint _submitInitToken;
         private static volatile int _submitError;
         private static volatile string _submitException;
@@ -50,6 +54,10 @@ namespace VoidCrewVRUIFix
         private readonly CVROverlay _overlay;
         private readonly ulong _handle;
         private readonly ulong _fillHandle;
+        private readonly ulong _fpsHandle;
+        private Texture _fpsTexture;
+        private bool _fpsShown;
+        private float _appliedFpsDistance = -1f;
         private readonly RenderTexture _fillTexture;
         private readonly uint _initToken;
         private bool _shown;
@@ -69,11 +77,12 @@ namespace VoidCrewVRUIFix
         private int _reportedError;
         private string _reportedException;
 
-        private SteamVrOverlayDisplay(CVROverlay overlay, ulong handle, ulong fillHandle)
+        private SteamVrOverlayDisplay(CVROverlay overlay, ulong handle, ulong fillHandle, ulong fpsHandle)
         {
             _overlay = overlay;
             _handle = handle;
             _fillHandle = fillHandle;
+            _fpsHandle = fpsHandle;
             _initToken = OpenVR.GetInitToken();
 
             Check(_overlay.SetOverlayFlag(handle, VROverlayFlags.IsPremultiplied, true), "SetOverlayFlag(IsPremultiplied)");
@@ -97,6 +106,21 @@ namespace VoidCrewVRUIFix
                     _submitFillHandle = fillHandle;
                     _submitFillTexture = new Texture_t { handle = nativeFill, eType = ETextureType.DirectX, eColorSpace = EColorSpace.Auto };
                     _submitFillActive = false;
+                }
+            }
+
+            if (fpsHandle != 0)
+            {
+                // The frame-rate counter: drawn above the UI, and flipped like the UI (Unity textures are stored bottom row first).
+                Check(_overlay.SetOverlaySortOrder(fpsHandle, 2), "SetOverlaySortOrder(fps)");
+                var bounds = new VRTextureBounds_t { uMin = 0f, uMax = 1f, vMin = 1f, vMax = 0f };
+                Check(_overlay.SetOverlayTextureBounds(fpsHandle, ref bounds), "SetOverlayTextureBounds(fps)");
+                _overlay.HideOverlay(fpsHandle);
+                lock (SubmitLock)
+                {
+                    _submitFpsHandle = fpsHandle;
+                    _submitFpsTexture = default(Texture_t);
+                    _submitFpsActive = false;
                 }
             }
         }
@@ -169,8 +193,16 @@ namespace VoidCrewVRUIFix
                 if (overlay.CreateOverlay(FillKey, "Void Crew UI background", ref fillHandle) != EVROverlayError.None) fillHandle = 0;
             }
 
+            // Optional third overlay for the frame-rate counter.
+            ulong fpsHandle = 0;
+            if (overlay.FindOverlay(FpsKey, ref fpsHandle) != EVROverlayError.None || fpsHandle == 0)
+            {
+                fpsHandle = 0;
+                if (overlay.CreateOverlay(FpsKey, "Void Crew FPS counter", ref fpsHandle) != EVROverlayError.None) fpsHandle = 0;
+            }
+
             reason = null;
-            return new SteamVrOverlayDisplay(overlay, handle, fillHandle);
+            return new SteamVrOverlayDisplay(overlay, handle, fillHandle, fpsHandle);
         }
 
         public void SetTexture(RenderTexture texture)
@@ -222,7 +254,49 @@ namespace VoidCrewVRUIFix
             }
 
             UpdateFill(show ? state.Fill : Color.clear);
+            UpdateFps(show ? state.FpsTexture : null);
             ReportRenderThreadProblems();
+        }
+
+        /// <summary>The frame-rate counter: locked to the head, up and to the left, in front of the UI panel.</summary>
+        private void UpdateFps(Texture texture)
+        {
+            if (_fpsHandle == 0) return;
+
+            bool show = texture != null;
+            if (show)
+            {
+                if (!ReferenceEquals(texture, _fpsTexture))
+                {
+                    // Asking for the native pointer waits for the render thread, so only when the texture changes.
+                    _fpsTexture = texture;
+                    IntPtr native = texture.GetNativeTexturePtr();
+                    lock (SubmitLock) _submitFpsTexture = new Texture_t { handle = native, eType = ETextureType.DirectX, eColorSpace = EColorSpace.Auto };
+                }
+
+                float distance = FpsCounter.Distance(PanelLayout.Distance);
+                if (Mathf.Abs(distance - _appliedFpsDistance) > 0.001f)
+                {
+                    var transform = new HmdMatrix34_t
+                    {
+                        m0 = 1f, m5 = 1f, m10 = 1f,
+                        m3 = FpsCounter.OffsetAtOneMetre.x * distance,
+                        m7 = FpsCounter.OffsetAtOneMetre.y * distance,
+                        m11 = -distance
+                    };
+                    Check(_overlay.SetOverlayTransformTrackedDeviceRelative(_fpsHandle, OpenVR.k_unTrackedDeviceIndex_Hmd, ref transform),
+                        "SetOverlayTransformTrackedDeviceRelative(fps)");
+                    Check(_overlay.SetOverlayWidthInMeters(_fpsHandle, FpsCounter.WidthAtOneMetre * distance), "SetOverlayWidthInMeters(fps)");
+                    _appliedFpsDistance = distance;
+                }
+            }
+
+            if (show != _fpsShown)
+            {
+                Check(show ? _overlay.ShowOverlay(_fpsHandle) : _overlay.HideOverlay(_fpsHandle), show ? "ShowOverlay(fps)" : "HideOverlay(fps)");
+                _fpsShown = show;
+                lock (SubmitLock) _submitFpsActive = show;
+            }
         }
 
         private void UpdateFill(Color fill)
@@ -293,6 +367,11 @@ namespace VoidCrewVRUIFix
                 Texture_t fill = _submitFillTexture;
                 _overlay.SetOverlayTexture(_fillHandle, ref fill);
             }
+            if (_fpsShown && _submitFpsTexture.handle != IntPtr.Zero)
+            {
+                Texture_t fps = _submitFpsTexture;
+                _overlay.SetOverlayTexture(_fpsHandle, ref fps);
+            }
             Interlocked.Increment(ref _submitCount);
         }
 
@@ -311,6 +390,9 @@ namespace VoidCrewVRUIFix
                 _submitFillHandle = 0;
                 _submitFillTexture = default(Texture_t);
                 _submitFillActive = false;
+                _submitFpsHandle = 0;
+                _submitFpsTexture = default(Texture_t);
+                _submitFpsActive = false;
             }
 
             // If VR was already turned off, OpenVR is gone and the overlays with it. Calling into it would crash.
@@ -322,6 +404,11 @@ namespace VoidCrewVRUIFix
                 {
                     _overlay.HideOverlay(_fillHandle);
                     _overlay.DestroyOverlay(_fillHandle);
+                }
+                if (_fpsHandle != 0)
+                {
+                    _overlay.HideOverlay(_fpsHandle);
+                    _overlay.DestroyOverlay(_fpsHandle);
                 }
             }
             if (_fillTexture != null)
@@ -436,6 +523,9 @@ namespace VoidCrewVRUIFix
                 ulong fillHandle;
                 Texture_t fillTexture;
                 bool fillActive;
+                ulong fpsHandle;
+                Texture_t fpsTexture;
+                bool fpsActive;
                 uint initToken;
                 lock (SubmitLock)
                 {
@@ -445,6 +535,9 @@ namespace VoidCrewVRUIFix
                     fillHandle = _submitFillHandle;
                     fillTexture = _submitFillTexture;
                     fillActive = _submitFillActive;
+                    fpsHandle = _submitFpsHandle;
+                    fpsTexture = _submitFpsTexture;
+                    fpsActive = _submitFpsActive;
                     initToken = _submitInitToken;
                 }
                 if (overlay == null || handle == 0 || texture.handle == IntPtr.Zero) return;
@@ -457,6 +550,10 @@ namespace VoidCrewVRUIFix
                 if (fillActive && fillHandle != 0 && fillTexture.handle != IntPtr.Zero)
                 {
                     overlay.SetOverlayTexture(fillHandle, ref fillTexture);
+                }
+                if (fpsActive && fpsHandle != 0 && fpsTexture.handle != IntPtr.Zero)
+                {
+                    overlay.SetOverlayTexture(fpsHandle, ref fpsTexture);
                 }
                 Interlocked.Increment(ref _submitCount);
             }

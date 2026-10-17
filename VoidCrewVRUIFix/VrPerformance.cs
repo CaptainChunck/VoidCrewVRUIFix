@@ -139,8 +139,7 @@ namespace VoidCrewVRUIFix
             HDRenderPipelineAsset asset;
             if (!TryGetXrSettings(out asset, out xr)) return "HDRP's VR settings could not be read";
 
-            return "single-pass allowed " + xr.singlePass +
-                   " | hidden-area mask " + (xr.occlusionMesh ? "on" : "off") + ", " + DescribeHeadsetMask(camera) +
+            return "hidden-area mask " + (xr.occlusionMesh ? "on" : "off") + ", " + DescribeHeadsetMask(camera) +
                    " | camera jitter " + (xr.cameraJitter ? "on" : "off") +
                    (Settings.DlssCameraJitter.Value ? (_jitterOn ? " (given to DLSS while it runs)" : " (only while DLSS runs)") : " (DLSS jitter turned off in the config)");
         }
