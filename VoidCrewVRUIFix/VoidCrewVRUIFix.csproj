@@ -119,6 +119,7 @@
     <Compile Include="CursorOverlay.cs" />
     <Compile Include="DesktopView.cs" />
     <Compile Include="Diagnostics.cs" />
+    <Compile Include="DlssEyes.cs" />
     <Compile Include="FullscreenFill.cs" />
     <Compile Include="GamePatches.cs" />
     <Compile Include="HdrpTweaks.cs" />

@@ -33,6 +33,8 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "CG.Input.MouseCursor", "UpdateCursorGraphic", nameof(HideHardwareCursorGraphic), null, "Windows cursor", applied, skipped);
             Patch(harmony, "UI.Settings.SettingsUIPanel", "OnInitialize", null, nameof(SettingsMenuCreated), "VR settings tab", applied, skipped);
             Patch(harmony, "UI.Settings.SettingsUIPanel", "OnEnter", null, nameof(SettingsMenuOpened), "VR settings tab refresh", applied, skipped);
+            // DLSS can only be picked when it is allowed, and changing that needs a restart.
+            if (!Settings.DisableDlss.Value) PatchDlssEyes(harmony, applied, skipped);
 
             // Both overloads of each are patched: the one-argument versions are small enough to be inlined into game code.
             Type[] mono = { typeof(Vector3) };
@@ -89,7 +91,7 @@ namespace VoidCrewVRUIFix
         }
 
         private static void PatchMethod(Harmony harmony, MethodBase target, string prefix, string postfix,
-            string label, List<string> applied, List<string> skipped)
+            string label, List<string> applied, List<string> skipped, string finalizer = null)
         {
             if (target == null)
             {
@@ -101,13 +103,38 @@ namespace VoidCrewVRUIFix
             {
                 harmony.Patch(target,
                     prefix != null ? new HarmonyMethod(typeof(GamePatches), prefix) : null,
-                    postfix != null ? new HarmonyMethod(typeof(GamePatches), postfix) : null);
+                    postfix != null ? new HarmonyMethod(typeof(GamePatches), postfix) : null,
+                    null,
+                    finalizer != null ? new HarmonyMethod(typeof(GamePatches), finalizer) : null,
+                    null);
                 applied.Add(label);
             }
             catch (Exception e)
             {
                 skipped.Add(label + " (" + e.GetType().Name + ": " + e.Message + ")");
             }
+        }
+
+        private static void PatchDlssEyes(Harmony harmony, List<string> applied, List<string> skipped)
+        {
+            string missing;
+            try
+            {
+                missing = DlssEyes.Resolve();
+            }
+            catch (Exception e)
+            {
+                missing = e.GetType().Name + ": " + e.Message;
+            }
+            if (missing != null)
+            {
+                skipped.Add("DLSS in VR (" + missing + ")");
+                return;
+            }
+
+            Type cameraState = AccessTools.TypeByName("UnityEngine.Rendering.HighDefinition.DLSSPass+CameraState");
+            PatchMethod(harmony, cameraState != null ? AccessTools.DeclaredMethod(cameraState, "SubmitCommands") : null,
+                nameof(DlssUseEyeNumber), null, "DLSS in VR", applied, skipped, nameof(DlssRestorePassId));
         }
 
         private static bool HideDlss(ref bool __result)
@@ -130,6 +157,22 @@ namespace VoidCrewVRUIFix
             __result = false;
             Log.InfoOnce("fsr3", "FSR3 removed from the graphics options because it is not built for VR rendering.");
             return false;
+        }
+
+        // DLSSPass.CameraState.SubmitCommands records one eye's DLSS commands on the main thread and never re-enters.
+        private static int _dlssPassIdToRestore = -1;
+
+        private static void DlssUseEyeNumber(UnityEngine.Rendering.HighDefinition.HDCamera camera)
+        {
+            _dlssPassIdToRestore = DlssEyes.UseEyeNumber(camera);
+        }
+
+        // A finalizer, so HDRP's id is put back even if DLSS throws.
+        private static void DlssRestorePassId(UnityEngine.Rendering.HighDefinition.HDCamera camera)
+        {
+            int passId = _dlssPassIdToRestore;
+            _dlssPassIdToRestore = -1;
+            DlssEyes.Restore(camera, passId);
         }
 
         private static void RedirectIntroVideo(MonoBehaviour __instance)

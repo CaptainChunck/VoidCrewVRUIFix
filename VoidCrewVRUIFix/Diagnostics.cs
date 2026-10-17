@@ -121,6 +121,8 @@ namespace VoidCrewVRUIFix
                 RenderPipelineSettings settings = asset.currentPlatformRenderPipelineSettings;
                 Line(report, "Asset", asset.name + ", colour buffer " + settings.colorBufferFormat + ", custom passes " + settings.supportCustomPass +
                                      ", dynamic resolution " + settings.dynamicResolutionSettings.enabled + ", DLSS hardware " + HDDynamicResolutionPlatformCapabilities.DLSSDetected);
+                Line(report, "DLSS", (Settings.DisableDlss.Value ? "removed from the options (VR tab > Allow DLSS is off)" : "allowed") +
+                                    ", eye fix " + DlssEyes.Describe());
             }
             else
             {
