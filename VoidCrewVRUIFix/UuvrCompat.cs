@@ -60,10 +60,46 @@ namespace VoidCrewVRUIFix
         }
 
         /// <summary>Reads a UUVR setting by its field name on Uuvr.ModConfiguration; null if unavailable.</summary>
-        private static string GetSetting(string fieldName)
+        public static string GetSetting(string fieldName)
+        {
+            ConfigEntryBase entry = GetEntry(fieldName);
+            return entry != null && entry.BoxedValue != null ? entry.BoxedValue.ToString() : null;
+        }
+
+        /// <summary>Changes a UUVR setting (the player asked for it in the VR settings tab). UUVR saves its own config.</summary>
+        public static bool SetSetting(string fieldName, string value)
+        {
+            ConfigEntryBase entry = GetEntry(fieldName);
+            if (entry == null)
+            {
+                Log.Warn("Could not change UUVR's '" + fieldName + "' setting (not found in this UUVR version).");
+                return false;
+            }
+            entry.BoxedValue = TomlTypeConverter.ConvertToValue(value, entry.SettingType);
+            Log.Info("Changed UUVR's '" + entry.Definition.Key + "' setting to " + value + ".");
+            return true;
+        }
+
+        /// <summary>Switches VR on or off the same way UUVR's F3 key does.</summary>
+        public static bool ToggleVr()
+        {
+            Resolve();
+            Type coreType = _configType != null ? _configType.Assembly.GetType("Uuvr.UuvrCore") : null;
+            UnityEngine.Object core = coreType != null ? UnityEngine.Object.FindObjectOfType(coreType) : null;
+            FieldInfo managerField = coreType != null ? AccessTools.Field(coreType, "_vrTogglerManager") : null;
+            object manager = core != null && managerField != null ? managerField.GetValue(core) : null;
+            MethodInfo toggle = manager != null ? AccessTools.Method(manager.GetType(), "ToggleVr") : null;
+            if (toggle == null) return false;
+
+            toggle.Invoke(manager, null);
+            return true;
+        }
+
+        private static ConfigEntryBase GetEntry(string fieldName)
         {
             try
             {
+                Resolve();
                 if (_configType == null) return null;
                 if (_config == null)
                 {
@@ -72,8 +108,7 @@ namespace VoidCrewVRUIFix
                     if (_config == null) return null;
                 }
                 FieldInfo field = AccessTools.Field(_configType, fieldName);
-                var entry = field != null ? field.GetValue(_config) as ConfigEntryBase : null;
-                return entry != null && entry.BoxedValue != null ? entry.BoxedValue.ToString() : null;
+                return field != null ? field.GetValue(_config) as ConfigEntryBase : null;
             }
             catch
             {

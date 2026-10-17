@@ -57,6 +57,10 @@
       <HintPath>$(BepInExDir)\plugins\uuvr-mono-modern\Uuvr.XR.OpenVR.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.InputSystem">
       <HintPath>$(GameManaged)\Unity.InputSystem.dll</HintPath>
       <Private>False</Private>
@@ -130,6 +134,7 @@
     <Compile Include="UiDisplay.cs" />
     <Compile Include="UuvrCompat.cs" />
     <Compile Include="VrUiRuntime.cs" />
+    <Compile Include="VrSettingsTab.cs" />
     <Compile Include="VrViewInput.cs" />
     <Compile Include="XrState.cs" />
   </ItemGroup>

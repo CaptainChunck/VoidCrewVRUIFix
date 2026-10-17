@@ -31,6 +31,8 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "SettingUpscaling", "SupportsFSR3", nameof(HideFsr3), null, "FSR3 option", applied, skipped);
             Patch(harmony, "VideoSwitcher", "SetupAndPlayVideo", null, nameof(RedirectIntroVideo), "intro video", applied, skipped);
             Patch(harmony, "CG.Input.MouseCursor", "UpdateCursorGraphic", nameof(HideHardwareCursorGraphic), null, "Windows cursor", applied, skipped);
+            Patch(harmony, "UI.Settings.SettingsUIPanel", "OnInitialize", null, nameof(SettingsMenuCreated), "VR settings tab", applied, skipped);
+            Patch(harmony, "UI.Settings.SettingsUIPanel", "OnEnter", null, nameof(SettingsMenuOpened), "VR settings tab refresh", applied, skipped);
 
             // Both overloads of each are patched: the one-argument versions are small enough to be inlined into game code.
             Type[] mono = { typeof(Vector3) };
@@ -128,6 +130,43 @@ namespace VoidCrewVRUIFix
         {
             if (!Settings.FixIntroVideo.Value || !XrState.IsActive) return;
             IntroVideo.Redirect(__instance.GetComponent<VideoPlayer>());
+        }
+
+        private static void SettingsMenuCreated(MonoBehaviour __instance)
+        {
+            try
+            {
+                InstallVrSettingsTab(__instance);
+            }
+            catch (Exception e)
+            {
+                Log.Warn("Could not add the VR tab to the Settings menu (the game may have been updated): " + e.GetType().Name + ": " + e.Message);
+            }
+        }
+
+        private static void SettingsMenuOpened()
+        {
+            try
+            {
+                RefreshVrSettingsTab();
+            }
+            catch (Exception e)
+            {
+                Log.Failure("Refreshing the VR settings tab", e);
+            }
+        }
+
+        // Kept separate so that if a game update changes the UI classes the tab uses, the failure is caught above.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void InstallVrSettingsTab(MonoBehaviour settingsScreen)
+        {
+            VrSettingsTab.Install(settingsScreen);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void RefreshVrSettingsTab()
+        {
+            VrSettingsTab.Refresh();
         }
 
         private static void HideHardwareCursorGraphic(ref bool showTexture)

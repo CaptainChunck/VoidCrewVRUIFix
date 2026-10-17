@@ -115,7 +115,7 @@ namespace VoidCrewVRUIFix
             }
 
             Section(report, "HDRP");
-            var asset = GraphicsSettings.currentRenderPipeline as HDRenderPipelineAsset;
+            var asset = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as HDRenderPipelineAsset;
             if (asset != null)
             {
                 RenderPipelineSettings settings = asset.currentPlatformRenderPipelineSettings;
@@ -124,7 +124,7 @@ namespace VoidCrewVRUIFix
             }
             else
             {
-                Line(report, "Asset", GraphicsSettings.currentRenderPipeline != null ? GraphicsSettings.currentRenderPipeline.GetType().Name : "none");
+                Line(report, "Asset", UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null ? UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline.GetType().Name : "none");
             }
 
             Section(report, "Recent warnings and errors");

@@ -124,7 +124,21 @@ You don't need to change any other UUVR setting. The plugin turns off UUVR's own
 
 ## Settings
 
-The plugin creates its settings file the first time the game runs:
+The easiest way to change the VR settings is in the game itself: open **Settings** and pick the **VR** tab (next to GRAPHICS). Changes apply straight away, so you can see the result in the headset:
+
+- VR on/off, and which VR API UUVR uses (OpenXR or OpenVR; needs a game restart)
+- UI display mode (SteamVR overlay or in-game panel), UI size, distance and height
+- Whether the UI follows your head
+- Menu background dimming and VR cursor size
+- Level horizon (UUVR's horizon lock)
+- What the game window on your monitor shows, and how wide a view it shows
+- Control from SteamVR's VR View window (for testing without a headset)
+
+<!-- SCREENSHOT: docs/images/vr-settings-tab.png (the VR tab in the game's Settings menu)
+![The VR tab in the game's Settings menu](docs/images/vr-settings-tab.png)
+-->
+
+The plugin also creates a settings file the first time the game runs, which has every option, including a few advanced ones:
 
 `BepInEx\config\com.user.voidcrew.vruifix.cfg`
 

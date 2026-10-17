@@ -31,6 +31,7 @@ namespace VoidCrewVRUIFix
         private Vector3 _cameraPosition;
         private Quaternion _cameraRotation = Quaternion.identity;
         private static bool _quitting;
+        private bool _displayModeChanged;
 
         public UiCapture Capture { get { return _capture; } }
         public IUiDisplay Display { get { return _display; } }
@@ -43,6 +44,7 @@ namespace VoidCrewVRUIFix
         {
             _cursor = new CursorOverlay(transform);
             Application.quitting += () => _quitting = true;
+            Settings.DisplayMode.SettingChanged += (sender, args) => _displayModeChanged = true;
 
             // Order inside each frame: headset image into the desktop picture, capture the UI, then put the UI on
             // the desktop picture and send it to the headset display.
@@ -110,6 +112,12 @@ namespace VoidCrewVRUIFix
                 Maintain();
             }
 
+            if (_displayModeChanged)
+            {
+                _displayModeChanged = false;
+                StopDisplay("the UI display setting changed to " + Settings.DisplayMode.Value);
+                _nextDisplayAttempt = 0f;
+            }
             if (_display != null && !_display.IsAlive) StopDisplay("it stopped working (was VR restarted?)");
             if (_display == null && Time.unscaledTime >= _nextDisplayAttempt) StartDisplay();
 
@@ -306,10 +314,9 @@ namespace VoidCrewVRUIFix
 
             if (Pressed(keyboard, Settings.KeyDisplayMode))
             {
+                // The setting's change event restarts the display.
                 Settings.DisplayMode.Value = _display is InGamePanelDisplay ? UiDisplayMode.SteamVROverlay : UiDisplayMode.InGamePanel;
                 Log.Info("[" + Settings.KeyDisplayMode.Value + "] Switching the VR UI display to " + Settings.DisplayMode.Value + " (saved to the config).");
-                StopDisplay(null);
-                _nextDisplayAttempt = 0f;
             }
 
             if (Pressed(keyboard, Settings.KeyDiagnostics))
