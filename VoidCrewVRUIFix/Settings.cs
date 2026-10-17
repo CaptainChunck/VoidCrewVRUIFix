@@ -49,6 +49,11 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<float> HudUpDown;
         public static ConfigEntry<float> HudDistance;
         public static ConfigEntry<float> HudSize;
+        public static ConfigEntry<bool> TurretHudFollowsHead;
+        public static ConfigEntry<float> TurretHudLeftRight;
+        public static ConfigEntry<float> TurretHudUpDown;
+        public static ConfigEntry<float> TurretHudDistance;
+        public static ConfigEntry<float> TurretHudSize;
 
         public static ConfigEntry<bool> ShowVrCursor;
         public static ConfigEntry<float> CursorScale;
@@ -122,6 +127,7 @@ namespace VoidCrewVRUIFix
             AimWithHead = config.Bind("Aiming", "Aim With Your Head", true,
                 "While you play (no menu or terminal open), the UI screen follows your head so the crosshair stays in the middle of your view, " +
                 "and weapons, tools and 'press E' interactions aim where you look. Your body still turns with the mouse. " +
+                "In a turret, the turret turns to wherever you look and the mouse turns your view. " +
                 "Off: you aim with the mouse only and the crosshair stays in front of the game camera.");
             HudFollowsHead = config.Bind("Player HUD", "Follows Your Head", true,
                 "Shows the player status HUD (portrait, health, oxygen, temperature) locked to your head, so it stays in view wherever you look. " +
@@ -135,6 +141,18 @@ namespace VoidCrewVRUIFix
                     new AcceptableValueRange<float>(0.3f, 3f)));
             HudSize = config.Bind("Player HUD", "Size", 1f,
                 new ConfigDescription("Size of the HUD: 1 is as big as it looks on the UI screen.", new AcceptableValueRange<float>(0.5f, 2f)));
+            TurretHudFollowsHead = config.Bind("Turret HUD", "Follows Your Head", true,
+                "While you control a turret, shows its readouts (heat or charge, ammo, range, spread and the turret's direction) locked to your head, " +
+                "like the player HUD. Off: they stay on the UI screen with the turret's crosshair.");
+            TurretHudLeftRight = config.Bind("Turret HUD", "Left/Right (degrees)", 0f,
+                new ConfigDescription("Where the turret HUD sits in your view, left (negative) or right (positive).", new AcceptableValueRange<float>(-45f, 45f)));
+            TurretHudUpDown = config.Bind("Turret HUD", "Up/Down (degrees)", -22f,
+                new ConfigDescription("Where the turret HUD sits in your view, down (negative) or up (positive).", new AcceptableValueRange<float>(-45f, 45f)));
+            TurretHudDistance = config.Bind("Turret HUD", "Distance", 1f,
+                new ConfigDescription("How far in front of your eyes the turret HUD floats, in metres. It is always kept nearer than the UI screen; " +
+                    "at the same distance as the player HUD, both sit on the same plane.", new AcceptableValueRange<float>(0.3f, 3f)));
+            TurretHudSize = config.Bind("Turret HUD", "Size", 0.8f,
+                new ConfigDescription("Size of the turret HUD: 1 is as big as it looks on the UI screen.", new AcceptableValueRange<float>(0.5f, 2f)));
 
             ShowVrCursor = config.Bind("Cursor", "Show VR Cursor", true,
                 "Draws the mouse cursor on the UI panel whenever the game shows a cursor (menus, terminals).");

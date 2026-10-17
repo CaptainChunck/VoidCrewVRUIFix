@@ -141,6 +141,7 @@
     <Compile Include="SteamVrOverlayDisplay.cs" />
     <Compile Include="SteamVrTiming.cs" />
     <Compile Include="TerminalScreens.cs" />
+    <Compile Include="TurretAim.cs" />
     <Compile Include="UiCapture.cs" />
     <Compile Include="UiDisplay.cs" />
     <Compile Include="UuvrCompat.cs" />

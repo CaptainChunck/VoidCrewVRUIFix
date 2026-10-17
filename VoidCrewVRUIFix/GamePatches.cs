@@ -44,6 +44,7 @@ namespace VoidCrewVRUIFix
             PatchLookWithHead(harmony, "CG.Client.Player.Interactions.RaycastHandler", "FindInteractable", "head aim (interactions)", applied, skipped);
             PatchLookWithHead(harmony, "UI.Ping.PingAbility", "GetPingInfo", "head aim (quick ping)", applied, skipped);
             PatchLookWithHead(harmony, "UI.Ping.PingDefinition", "GetTarget", "head aim (ping wheel)", applied, skipped);
+            PatchTurretAim(harmony, applied, skipped);
             // Always on, even when DLSS is hidden from the options: if DLSS still ends up running in VR (for example a
             // setting saved before the plugin was installed), HDRP's DLSS fails on every frame without it, and the
             // headset shows nothing.
@@ -132,6 +133,18 @@ namespace VoidCrewVRUIFix
                 return;
             }
             PatchMethod(harmony, target, nameof(LookWithHead), null, label, applied, skipped, nameof(LookWithHeadEnd));
+        }
+
+        /// <summary>
+        /// Turrets aim where you look (see TurretAim): the turret controls hand the mouse over, and right after the game
+        /// places its camera, the camera gets your view direction and the turret is turned. Only used when both are in place.
+        /// </summary>
+        private static void PatchTurretAim(Harmony harmony, List<string> applied, List<string> skipped)
+        {
+            int before = applied.Count;
+            Patch(harmony, "ControllingTurret", "TrueUpdate", nameof(TurretControls), null, "head aim (turret controls)", applied, skipped);
+            Patch(harmony, "CinemachineBrainUpdater", "LateUpdate", null, nameof(TurretCamera), "head aim (turret camera)", applied, skipped);
+            TurretAim.Hooked = applied.Count - before == 2;
         }
 
         private static void PatchMethod(Harmony harmony, MethodBase target, string prefix, string postfix,
@@ -302,6 +315,19 @@ namespace VoidCrewVRUIFix
         private static void LookWithHeadEnd(Quaternion? __state)
         {
             HeadAim.TurnCameraBack(__state);
+        }
+
+        // The local player's turret controls, every frame in a turret: while the turret aims where you look, the mouse
+        // turns your view instead of the turret.
+        private static bool TurretControls(object __instance)
+        {
+            return !TurretAim.TakeOverInput(__instance);
+        }
+
+        // Right after the game camera is placed for the frame.
+        private static void TurretCamera(CinemachineBrainUpdater __instance)
+        {
+            if (TurretAim.Steering) TurretAim.AfterCameraUpdate(__instance);
         }
 
         // Mouse positions are mapped onto a terminal screen that isn't attached to the camera.

@@ -21,12 +21,37 @@ namespace VoidCrewVRUIFix
         private static PropertyInfo _interactionState;
         private static PropertyInfo _activeModes;
         private static long _vehicleViewMask;
+        private static long _turretMask;
 
         /// <summary>True while the player controls a turret or looks through the ship's outside cameras (third-person flying, periscope).</summary>
         public static bool InVehicleView()
         {
             long modes;
             return TryGetModes(out modes) && (modes & _vehicleViewMask) != 0;
+        }
+
+        /// <summary>True while the player controls a turret.</summary>
+        public static bool InTurret()
+        {
+            long modes;
+            return TryGetModes(out modes) && (modes & _turretMask) != 0;
+        }
+
+        /// <summary>The game's local player object, or null when there is none (menus, loading).</summary>
+        public static UnityEngine.Object LocalPlayer()
+        {
+            if (_broken || !Resolve()) return null;
+            try
+            {
+                var player = _localPlayer.GetValue(null, null) as UnityEngine.Object;
+                return player != null ? player : null;
+            }
+            catch (Exception e)
+            {
+                _broken = true;
+                Log.Failure("Finding the local player", e);
+                return null;
+            }
         }
 
         /// <summary>The player's active interaction modes as flags, or false when there is no player (menus, loading).</summary>
@@ -88,6 +113,7 @@ namespace VoidCrewVRUIFix
                 if (Enum.IsDefined(activeModes.PropertyType, name)) _vehicleViewMask |= Convert.ToInt64(Enum.Parse(activeModes.PropertyType, name));
                 else Log.Verbose("Interaction mode '" + name + "' not found in this game version.");
             }
+            if (Enum.IsDefined(activeModes.PropertyType, "ControllingTurret")) _turretMask = Convert.ToInt64(Enum.Parse(activeModes.PropertyType, "ControllingTurret"));
             _activeModes = activeModes;
             return true;
         }

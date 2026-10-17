@@ -18,15 +18,11 @@ namespace VoidCrewVRUIFix
         /// <summary>The frame-rate counter's picture, shown locked to the head; null when it is turned off.</summary>
         public Texture FpsTexture;
 
-        /// <summary>The status HUD's picture, shown locked to the head; null when it isn't shown.</summary>
-        public Texture HudTexture;
+        /// <summary>The player status HUD, shown locked to the head; its texture is null when it isn't shown.</summary>
+        public HeadLockedPicture Hud;
 
-        /// <summary>The HUD's place relative to the eyes (Unity camera space, +Z forward), facing them.</summary>
-        public Vector3 HudPosition;
-        public Quaternion HudRotation;
-
-        /// <summary>The HUD's size in metres.</summary>
-        public Vector2 HudSize;
+        /// <summary>The turret's readouts while you control a turret, shown locked to the head.</summary>
+        public HeadLockedPicture TurretHud;
     }
 
     /// <summary>A way of showing the captured UI texture in the headset.</summary>

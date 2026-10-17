@@ -10,8 +10,9 @@ namespace VoidCrewVRUIFix
     /// or terminal open) and "Aim With Your Head" is on, the UI screen follows your head, so the crosshair is in the
     /// middle of your view, and weapons, tools and interactions aim along the line from your eyes through it.
     /// Your body still turns with the mouse only.
-    /// In a turret (and the ship's outside cameras) the mouse aims the turret, which shoots along the game camera's centre
-    /// line, so there the UI screen stays in front of the game camera with the crosshair on that line.
+    /// In a turret the turret turns to where you look, and the mouse turns your view (see TurretAim). In the ship's outside
+    /// cameras (and in a turret with head aim off) the mouse aims along the game camera's centre line, so there the UI
+    /// screen stays in front of the game camera with the crosshair on that line.
     /// </summary>
     internal static class HeadAim
     {
@@ -28,15 +29,18 @@ namespace VoidCrewVRUIFix
         public static bool Aiming { get; private set; }
 
         /// <summary>
-        /// True while the player controls a turret or looks through the ship's outside cameras. The crosshair then
-        /// shows where the turret or ship aims: the UI screen stays in front of the game camera, centred on its line.
+        /// True while the mouse aims along the game camera's centre line: the ship's outside cameras, or a turret while
+        /// it isn't aimed with the head. The crosshair then shows where the guns aim: the UI screen stays in front of the
+        /// game camera, centred on its line.
         /// </summary>
         public static bool InVehicleView { get; private set; }
 
         /// <summary>Once per frame: whether the player is playing (no menu or terminal) decides both.</summary>
         public static void Update(bool vrActive, bool menuOpen)
         {
-            bool vehicle = vrActive && PlayerModes.InVehicleView();
+            // A turret aimed with the head works like playing on foot: the crosshair is in the middle of your view.
+            TurretAim.SetSteering(vrActive && Settings.AimWithHead.Value && !menuOpen && TurretAim.InTurret);
+            bool vehicle = vrActive && !TurretAim.Steering && PlayerModes.InVehicleView();
             if (vehicle != InVehicleView)
             {
                 InVehicleView = vehicle;
@@ -53,6 +57,7 @@ namespace VoidCrewVRUIFix
             Aiming = false;
             PanelFollowsHead = false;
             InVehicleView = false;
+            TurretAim.Stop();
         }
 
         /// <summary>

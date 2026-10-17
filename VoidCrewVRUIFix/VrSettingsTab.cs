@@ -213,7 +213,8 @@ namespace VoidCrewVRUIFix
                 () => Settings.Anchor.Value == PanelAnchor.Head, on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
             AddToggle(rows, refreshers, "AIM WITH YOUR HEAD",
                 "On (default): while you play, the crosshair stays in the middle of your view, and your weapons, tools and 'press E' interactions aim where you look. " +
-                "Your body still turns with the mouse. Menus and terminals stay put in front of you. Off: you aim with the mouse only.",
+                "Your body still turns with the mouse. In a turret, the turret turns to wherever you look and the mouse turns your view. " +
+                "Menus and terminals stay put in front of you. Off: you aim with the mouse only.",
                 () => Settings.AimWithHead.Value, on => Settings.AimWithHead.Value = on);
             const string HudPreview = " The HUD shows in the headset for a few seconds while you change this, so you can see where it goes.";
             AddToggle(rows, refreshers, "PLAYER HUD FOLLOWS YOUR HEAD",
@@ -236,6 +237,28 @@ namespace VoidCrewVRUIFix
                 "Size of the player HUD (default 1.0X, as big as it looks on the UI screen)." + HudPreview,
                 0.5f, 2f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
                 () => Settings.HudSize.Value, v => Settings.HudSize.Value = Mathf.Round(v * 10f) / 10f);
+            const string TurretPreview = " The turret HUD shows in the headset for a few seconds while you change this (a TURRET box until you have used a turret).";
+            AddToggle(rows, refreshers, "TURRET HUD FOLLOWS YOUR HEAD",
+                "On (default): while you control a turret, its readouts (heat or charge, ammo, range, spread and the turret's direction) are locked to your head, " +
+                "like the player HUD. Off: they stay on the UI screen with the turret's crosshair." + TurretPreview,
+                () => Settings.TurretHudFollowsHead.Value, on => Settings.TurretHudFollowsHead.Value = on);
+            AddSlider(rows, refreshers, "TURRET HUD LEFT / RIGHT",
+                "Moves the turret HUD left (negative) or right (positive) in your view, in degrees (default 0)." + TurretPreview,
+                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.TurretHudLeftRight.Value, v => Settings.TurretHudLeftRight.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "TURRET HUD UP / DOWN",
+                "Moves the turret HUD down (negative) or up (positive) in your view, in degrees (default -22)." + TurretPreview,
+                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.TurretHudUpDown.Value, v => Settings.TurretHudUpDown.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "TURRET HUD DISTANCE",
+                "Moves the turret HUD nearer or further away (default 1.0 m). Set it to the player HUD's distance to put both on the same plane. " +
+                "It is always kept nearer than the UI screen." + TurretPreview,
+                0.3f, 3f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
+                () => Settings.TurretHudDistance.Value, v => Settings.TurretHudDistance.Value = Mathf.Round(v * 10f) / 10f);
+            AddSlider(rows, refreshers, "TURRET HUD SIZE",
+                "Size of the turret HUD (default 0.8X; 1.0X is as big as it looks on the UI screen)." + TurretPreview,
+                0.5f, 2f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
+                () => Settings.TurretHudSize.Value, v => Settings.TurretHudSize.Value = Mathf.Round(v * 10f) / 10f);
             AddSlider(rows, refreshers, "DARKEN WORLD BEHIND MENUS",
                 "While a menu or terminal is open, puts a dark layer over the game world behind it, which can make menu text easier to read (default 0%, off). " +
                 "Menus that already darken the screen, like Settings, only get slightly darker.",
