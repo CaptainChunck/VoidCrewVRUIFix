@@ -211,6 +211,27 @@ namespace VoidCrewVRUIFix
             AddToggle(rows, refreshers, "UI SCREEN FOLLOWS YOUR HEAD",
                 "On: the UI screen stays in front of your eyes wherever you look. Off (default): it stays in front of the game camera, so you can look around it, and markers and pings line up with the world.",
                 () => Settings.Anchor.Value == PanelAnchor.Head, on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
+            const string HudPreview = " The HUD shows in the headset for a few seconds while you change this, so you can see where it goes.";
+            AddToggle(rows, refreshers, "PLAYER HUD FOLLOWS YOUR HEAD",
+                "On (default): the player status HUD (portrait, health, oxygen, temperature) is locked to your head, so it stays in view wherever you look. " +
+                "Off: it stays on the UI screen with the rest of the HUD." + HudPreview,
+                () => Settings.HudFollowsHead.Value, on => Settings.HudFollowsHead.Value = on);
+            AddSlider(rows, refreshers, "PLAYER HUD LEFT / RIGHT",
+                "Moves the player HUD left (negative) or right (positive) in your view, in degrees (default -20)." + HudPreview,
+                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.HudLeftRight.Value, v => Settings.HudLeftRight.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "PLAYER HUD UP / DOWN",
+                "Moves the player HUD down (negative) or up (positive) in your view, in degrees (default -18)." + HudPreview,
+                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.HudUpDown.Value, v => Settings.HudUpDown.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "PLAYER HUD DISTANCE",
+                "Moves the player HUD nearer or further away (default 1.0 m). It is always kept nearer than the UI screen, so it is never hidden behind it." + HudPreview,
+                0.3f, 3f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
+                () => Settings.HudDistance.Value, v => Settings.HudDistance.Value = Mathf.Round(v * 10f) / 10f);
+            AddSlider(rows, refreshers, "PLAYER HUD SIZE",
+                "Size of the player HUD (default 1.0X, as big as it looks on the UI screen)." + HudPreview,
+                0.5f, 2f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
+                () => Settings.HudSize.Value, v => Settings.HudSize.Value = Mathf.Round(v * 10f) / 10f);
             AddSlider(rows, refreshers, "DARKEN WORLD BEHIND MENUS",
                 "While a menu or terminal is open, puts a dark layer over the game world behind it, which can make menu text easier to read (default 0%, off). " +
                 "Menus that already darken the screen, like Settings, only get slightly darker.",

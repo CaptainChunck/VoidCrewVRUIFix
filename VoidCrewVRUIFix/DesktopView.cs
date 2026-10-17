@@ -23,6 +23,7 @@ namespace VoidCrewVRUIFix
         private bool _sceneDrawn;
 
         private Material _fillMaterial;
+        private Material _hudMaterial;
 
         public int LastDrawnFrame { get; private set; } = -1;
         public string Problem { get; private set; }
@@ -65,7 +66,7 @@ namespace VoidCrewVRUIFix
         }
 
         /// <summary>Step 2, after the UI was captured: the UI over the scene, then the finished picture onto the window.</summary>
-        public void Composite(CommandBuffer commands, RenderTexture ui)
+        public void Composite(CommandBuffer commands, RenderTexture ui, Texture hud = null, Rect hudUv = default(Rect))
         {
             if (!_sceneReady || _frame == null) return;
             _sceneReady = false;
@@ -93,6 +94,16 @@ namespace VoidCrewVRUIFix
                 commands.DrawMesh(_quad,
                     Matrix4x4.TRS(new Vector3(_uiRect.center.x, _uiRect.center.y, 0f), Quaternion.identity, new Vector3(_uiRect.width, _uiRect.height, 1f)),
                     _uiMaterial, 0, 0);
+
+                if (hud != null)
+                {
+                    // The status HUD was cut out of the UI for the headset; on the monitor it goes back where it was.
+                    if (_hudMaterial == null) _hudMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Desktop HUD");
+                    _hudMaterial.mainTexture = hud;
+                    var centre = new Vector2(_uiRect.x + hudUv.center.x * _uiRect.width, _uiRect.y + hudUv.center.y * _uiRect.height);
+                    commands.DrawMesh(_quad, Matrix4x4.TRS(new Vector3(centre.x, centre.y, 0f), Quaternion.identity,
+                        new Vector3(hudUv.width * _uiRect.width, hudUv.height * _uiRect.height, 1f)), _hudMaterial, 0, 0);
+                }
             }
 
             commands.Blit(_frame, new RenderTargetIdentifier(Display.main.colorBuffer));
@@ -109,6 +120,7 @@ namespace VoidCrewVRUIFix
             }
             if (_uiMaterial != null) Object.Destroy(_uiMaterial);
             if (_fillMaterial != null) Object.Destroy(_fillMaterial);
+            if (_hudMaterial != null) Object.Destroy(_hudMaterial);
             if (_quad != null) Object.Destroy(_quad);
             _uiMaterial = null;
             _fillMaterial = null;

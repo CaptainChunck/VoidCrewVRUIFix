@@ -7,8 +7,8 @@ namespace VoidCrewVRUIFix
     /// <summary>
     /// A small frame-rate counter for the headset, in the top left of your view: the game's frames per second, green at
     /// the headset's full refresh rate, yellow at half of it or more, red below that. It is drawn with a tiny built-in
-    /// pixel font into its own texture, so it needs nothing from the game's UI, and the displays show it locked to your
-    /// view.
+    /// pixel font (PixelFont) into its own texture, so it needs nothing from the game's UI, and the displays show it
+    /// locked to your view.
     /// </summary>
     internal sealed class FpsCounter
     {
@@ -20,13 +20,10 @@ namespace VoidCrewVRUIFix
 
         private const float RefreshInterval = 0.5f;
         private const int MaxCharacters = 7;
-        private const int GlyphWidth = 5;
-        private const int GlyphHeight = 7;
-        private const int Advance = 6;
         private const int Scale = 4;
         private const int Padding = 6;
-        private const int TextureWidth = Padding * 2 + (MaxCharacters * Advance - 1) * Scale;
-        private const int TextureHeight = Padding * 2 + GlyphHeight * Scale;
+        private const int TextureWidth = Padding * 2 + (MaxCharacters * PixelFont.Advance - 1) * Scale;
+        private const int TextureHeight = Padding * 2 + PixelFont.GlyphHeight * Scale;
 
         private static readonly Color32 Background = new Color32(0, 0, 0, 150);
         private static readonly Color32 Clear = new Color32(0, 0, 0, 0);
@@ -34,25 +31,6 @@ namespace VoidCrewVRUIFix
         private static readonly Color32 Yellow = new Color32(255, 210, 60, 255);
         private static readonly Color32 Red = new Color32(255, 80, 70, 255);
         private static readonly Color32 White = new Color32(240, 240, 240, 255);
-
-        // 5 x 7 pixel glyphs, top row first; bit 4 is the leftmost column.
-        private static readonly Dictionary<char, byte[]> Glyphs = new Dictionary<char, byte[]>
-        {
-            { '0', new byte[] { 0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E } },
-            { '1', new byte[] { 0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E } },
-            { '2', new byte[] { 0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F } },
-            { '3', new byte[] { 0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E } },
-            { '4', new byte[] { 0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02 } },
-            { '5', new byte[] { 0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E } },
-            { '6', new byte[] { 0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E } },
-            { '7', new byte[] { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 } },
-            { '8', new byte[] { 0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E } },
-            { '9', new byte[] { 0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C } },
-            { 'F', new byte[] { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10 } },
-            { 'P', new byte[] { 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10 } },
-            { 'S', new byte[] { 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E } },
-            { '-', new byte[] { 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00 } }
-        };
 
         private static readonly List<XRDisplaySubsystem> Displays = new List<XRDisplaySubsystem>();
 
@@ -150,7 +128,7 @@ namespace VoidCrewVRUIFix
             _drawnText = text;
             _drawnColour = colour;
 
-            int textWidth = (text.Length * Advance - 1) * Scale;
+            int textWidth = PixelFont.Width(text, Scale);
             int left = (TextureWidth - textWidth) / 2;
             int backgroundLeft = Mathf.Max(0, left - Padding);
             int backgroundRight = Mathf.Min(TextureWidth, left + textWidth + Padding);
@@ -161,26 +139,7 @@ namespace VoidCrewVRUIFix
                     _pixels[y * TextureWidth + x] = x >= backgroundLeft && x < backgroundRight ? Background : Clear;
                 }
             }
-
-            for (int i = 0; i < text.Length; i++)
-            {
-                byte[] glyph;
-                if (!Glyphs.TryGetValue(text[i], out glyph)) continue;
-                for (int row = 0; row < GlyphHeight; row++)
-                {
-                    for (int column = 0; column < GlyphWidth; column++)
-                    {
-                        if ((glyph[row] & (0x10 >> column)) == 0) continue;
-                        int x0 = left + (i * Advance + column) * Scale;
-                        int top = Padding + row * Scale;
-                        for (int dy = 0; dy < Scale; dy++)
-                        {
-                            int y = TextureHeight - 1 - (top + dy);
-                            for (int dx = 0; dx < Scale; dx++) _pixels[y * TextureWidth + x0 + dx] = colour;
-                        }
-                    }
-                }
-            }
+            PixelFont.Draw(_pixels, TextureWidth, TextureHeight, text, left, Padding, Scale, colour);
 
             _texture.SetPixels32(_pixels);
             _texture.Apply(false, false);

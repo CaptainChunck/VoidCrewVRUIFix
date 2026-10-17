@@ -73,6 +73,7 @@ namespace VoidCrewVRUIFix
                                    ", screen camera '" + (capture.LastScreenCamera != null ? capture.LastScreenCamera.name : "none") +
                                    "', backdrop " + capture.BackdropOpacity.ToString("0.00"));
             Line(report, "Player camera", runtime.MainCamera != null ? Describe(runtime.MainCamera) : "none");
+            Line(report, "Player HUD", runtime.Hud.Describe());
             Line(report, "Cursor", runtime.Cursor.Describe() + " | game wants cursor " + UnityEngine.Cursor.visible + ", lock " + UnityEngine.Cursor.lockState);
             Line(report, "Desktop view", runtime.Desktop.Describe() + ", Unity mirror " + XRSettings.showDeviceView);
 

@@ -69,6 +69,8 @@ namespace VoidCrewVRUIFix
             _pass.GameCameraToWorld = Matrix4x4.TRS(state.CameraPosition, state.CameraRotation, Vector3.one);
             _pass.Fill = state.Fill;
             _pass.FpsTexture = state.FpsTexture;
+            _pass.HudTexture = state.HudTexture;
+            _pass.HudInCamera = Matrix4x4.TRS(state.HudPosition, state.HudRotation, new Vector3(state.HudSize.x, state.HudSize.y, 1f));
             if (state.FpsTexture != null)
             {
                 float distance = FpsCounter.Distance(PanelLayout.Distance);
@@ -123,6 +125,8 @@ namespace VoidCrewVRUIFix
         public Color Fill;
         public Texture FpsTexture;
         public Matrix4x4 FpsInCamera = Matrix4x4.identity;
+        public Texture HudTexture;
+        public Matrix4x4 HudInCamera = Matrix4x4.identity;
 
         private const float FillExtraDistance = 0.25f;
         private const float FillHalfAngle = 80f;
@@ -133,6 +137,7 @@ namespace VoidCrewVRUIFix
         private Material _material;
         private Material _fillMaterial;
         private Material _fpsMaterial;
+        private Material _hudMaterial;
         private Mesh _quad;
         private Mesh _flippedQuad;
 
@@ -142,6 +147,7 @@ namespace VoidCrewVRUIFix
             _fillMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Panel Fill");
             _fillMaterial.mainTexture = Texture2D.whiteTexture;
             _fpsMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix FPS counter");
+            _hudMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix HUD");
             _quad = RenderUtil.CreateQuad(false);
             _flippedQuad = RenderUtil.CreateQuad(true);
         }
@@ -175,6 +181,13 @@ namespace VoidCrewVRUIFix
             _material.mainTexture = Texture;
             ctx.cmd.DrawMesh(FlipVertically ? _flippedQuad : _quad, anchor * PanelInCamera, _material, 0, 0);
 
+            if (HudTexture != null)
+            {
+                // The status HUD, locked to the head where the HUD settings put it.
+                _hudMaterial.mainTexture = HudTexture;
+                ctx.cmd.DrawMesh(FlipVertically ? _flippedQuad : _quad, head * HudInCamera, _hudMaterial, 0, 0);
+            }
+
             if (FpsTexture != null)
             {
                 // The frame-rate counter, locked to the head like a SteamVR overlay would be.
@@ -189,6 +202,7 @@ namespace VoidCrewVRUIFix
             CoreUtils.Destroy(_material);
             CoreUtils.Destroy(_fillMaterial);
             CoreUtils.Destroy(_fpsMaterial);
+            CoreUtils.Destroy(_hudMaterial);
             CoreUtils.Destroy(_quad);
             CoreUtils.Destroy(_flippedQuad);
         }

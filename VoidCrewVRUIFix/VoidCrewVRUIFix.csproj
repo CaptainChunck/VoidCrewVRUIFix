@@ -126,10 +126,12 @@
     <Compile Include="HdrpTweaks.cs" />
     <Compile Include="HeadsetPresence.cs" />
     <Compile Include="HotkeyCapture.cs" />
+    <Compile Include="HudLayer.cs" />
     <Compile Include="InGamePanelDisplay.cs" />
     <Compile Include="IntroVideo.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="PanelLayout.cs" />
+    <Compile Include="PixelFont.cs" />
     <Compile Include="RenderUtil.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

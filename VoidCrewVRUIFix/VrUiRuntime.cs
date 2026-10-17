@@ -25,6 +25,7 @@ namespace VoidCrewVRUIFix
         private readonly DesktopView _desktop = new DesktopView();
         private readonly FullscreenFill _fill = new FullscreenFill();
         private readonly FpsCounter _fps = new FpsCounter();
+        private readonly HudLayer _hud = new HudLayer();
         private readonly CanvasMover _canvases = new CanvasMover();
         private readonly VrViewInput _vrViewInput = new VrViewInput();
         private CursorOverlay _cursor;
@@ -51,6 +52,7 @@ namespace VoidCrewVRUIFix
         public CanvasMover Canvases { get { return _canvases; } }
         public DesktopView Desktop { get { return _desktop; } }
         public FpsCounter Fps { get { return _fps; } }
+        public HudLayer Hud { get { return _hud; } }
 
         /// <summary>Whether the game window on the monitor shows the game right now.</summary>
         public bool PictureShown { get { return _pictureShown; } }
@@ -64,6 +66,13 @@ namespace VoidCrewVRUIFix
             Settings.DisableUuvrHelperCameras.SettingChanged += (sender, args) => UuvrCompat.RequestScan();
             SceneManager.sceneLoaded += (scene, mode) => _canvasScanDue = true;
 
+            // Changing a HUD setting shows the HUD for a few seconds, even with the Settings menu open.
+            Settings.HudFollowsHead.SettingChanged += (sender, args) => _hud.StartPreview();
+            Settings.HudLeftRight.SettingChanged += (sender, args) => _hud.StartPreview();
+            Settings.HudUpDown.SettingChanged += (sender, args) => _hud.StartPreview();
+            Settings.HudDistance.SettingChanged += (sender, args) => _hud.StartPreview();
+            Settings.HudSize.SettingChanged += (sender, args) => _hud.StartPreview();
+
             // Order inside each frame: headset image into the desktop picture, capture the UI, then put the UI on
             // the desktop picture and send it to the headset display. With the monitor picture off, the desktop
             // picture is skipped and the window stays black.
@@ -74,9 +83,13 @@ namespace VoidCrewVRUIFix
             };
             _capture.AfterCapture = (commands, ui) =>
             {
+                _hud.Extract(commands, ui);
                 _fill.Sample(commands, ui);
                 _desktop.Fill = _fill.Current;
-                if (_pictureShown && Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.Composite(commands, ui);
+                if (_pictureShown && Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror)
+                {
+                    _desktop.Composite(commands, ui, _hud.Extracting ? _hud.CopyTexture : null, _hud.UvRect);
+                }
                 if (_display != null) _display.AppendSubmit(commands);
             };
         }
@@ -101,6 +114,7 @@ namespace VoidCrewVRUIFix
             _desktop.Release();
             _fill.Release();
             _fps.Release();
+            _hud.Release();
         }
 
         private void Update()
@@ -155,6 +169,7 @@ namespace VoidCrewVRUIFix
             bool menuOpen = UnityEngine.Cursor.visible && UnityEngine.Cursor.lockState != CursorLockMode.Locked;
             // A terminal's screen is part of the world, so it isn't darkened like a menu.
             _capture.BackdropOpacity = menuOpen && !PanelLayout.OnTerminalScreen ? Settings.MenuBackdropOpacity.Value : 0f;
+            _hud.Update(menuOpen, _fill.Current.a > 0.003f);
             _desktop.UiInSceneImage = _display is InGamePanelDisplay;
             _cursor.Update(Settings.ShowVrCursor.Value && menuOpen);
             IntroVideo.Update();
@@ -196,6 +211,9 @@ namespace VoidCrewVRUIFix
 
                 if (_display != null)
                 {
+                    Vector3 hudPosition;
+                    Quaternion hudRotation;
+                    HudLayer.Placement(out hudPosition, out hudRotation);
                     _display.Update(new PanelState
                     {
                         Visible = _capture.Texture != null,
@@ -203,7 +221,11 @@ namespace VoidCrewVRUIFix
                         CameraPosition = _cameraPosition,
                         CameraRotation = _cameraRotation,
                         Fill = _fill.Current,
-                        FpsTexture = _fps.Texture
+                        FpsTexture = _fps.Texture,
+                        HudTexture = _hud.DisplayTexture,
+                        HudPosition = hudPosition,
+                        HudRotation = hudRotation,
+                        HudSize = _hud.SizeMeters()
                     });
                 }
             }
@@ -258,6 +280,7 @@ namespace VoidCrewVRUIFix
             _pictureForHeadsetOff = false;
             VrPerformance.OnVrStopped();
             PanelLayout.LeaveTerminal();
+            _hud.Stop();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;

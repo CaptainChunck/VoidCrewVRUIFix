@@ -43,6 +43,12 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<float> MenuBackdropOpacity;
         public static ConfigEntry<bool> FlipVertically;
 
+        public static ConfigEntry<bool> HudFollowsHead;
+        public static ConfigEntry<float> HudLeftRight;
+        public static ConfigEntry<float> HudUpDown;
+        public static ConfigEntry<float> HudDistance;
+        public static ConfigEntry<float> HudSize;
+
         public static ConfigEntry<bool> ShowVrCursor;
         public static ConfigEntry<float> CursorScale;
         public static ConfigEntry<bool> HideHardwareCursor;
@@ -110,6 +116,19 @@ namespace VoidCrewVRUIFix
                     new AcceptableValueRange<float>(0f, 1f)));
             FlipVertically = config.Bind("UI Panel", "Flip Vertically", false,
                 "Turn on if the UI appears upside down in the headset. Can also be toggled in game with the Flip UI hotkey.");
+
+            HudFollowsHead = config.Bind("Player HUD", "Follows Your Head", true,
+                "Shows the player status HUD (portrait, health, oxygen, temperature) locked to your head, so it stays in view wherever you look. " +
+                "Off: it stays on the UI screen with the rest of the HUD.");
+            HudLeftRight = config.Bind("Player HUD", "Left/Right (degrees)", -20f,
+                new ConfigDescription("Where the HUD sits in your view, left (negative) or right (positive).", new AcceptableValueRange<float>(-45f, 45f)));
+            HudUpDown = config.Bind("Player HUD", "Up/Down (degrees)", -18f,
+                new ConfigDescription("Where the HUD sits in your view, down (negative) or up (positive).", new AcceptableValueRange<float>(-45f, 45f)));
+            HudDistance = config.Bind("Player HUD", "Distance", 1f,
+                new ConfigDescription("How far in front of your eyes the HUD floats, in metres. It is always kept nearer than the UI screen.",
+                    new AcceptableValueRange<float>(0.3f, 3f)));
+            HudSize = config.Bind("Player HUD", "Size", 1f,
+                new ConfigDescription("Size of the HUD: 1 is as big as it looks on the UI screen.", new AcceptableValueRange<float>(0.5f, 2f)));
 
             ShowVrCursor = config.Bind("Cursor", "Show VR Cursor", true,
                 "Draws the mouse cursor on the UI panel whenever the game shows a cursor (menus, terminals).");
