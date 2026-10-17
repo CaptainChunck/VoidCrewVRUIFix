@@ -52,6 +52,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> DisableUuvrUi;
         public static ConfigEntry<bool> DisableUuvrHelperCameras;
         public static ConfigEntry<DesktopViewMode> DesktopView;
+        public static ConfigEntry<float> DesktopViewWidth;
         public static ConfigEntry<bool> ClearDesktopEachFrame;
 
         public static ConfigEntry<Key> KeyFlip;
@@ -118,9 +119,12 @@ namespace VoidCrewVRUIFix
                 "Only applied when UUVR's Camera Tracking Mode is RelativeTransform (the default).");
             DesktopView = config.Bind("Fixes", "Desktop View", DesktopViewMode.PanelView,
                 "What the game window on your monitor shows while in VR.\n" +
-                "PanelView: the headset image cropped to the area the UI panel covers, with the UI and cursor on top. Looks and plays like the normal game.\n" +
-                "HeadsetMirror: SteamVR's own mirror of one eye (zoomed in, no UI).\n" +
-                "UiOnly: just the UI on black (lightest on performance).");
+                "PanelView: what the headset shows (right eye), with the UI panel and cursor drawn where they appear in VR. You can play from it.\n" +
+                "HeadsetMirror: Unity's own mirror of the right eye (zoomed in, no UI).\n" +
+                "UiOnly: just the UI and cursor, full size, on black.");
+            DesktopViewWidth = config.Bind("Fixes", "Desktop View Width (degrees)", 90f,
+                new ConfigDescription("How wide a view the game window shows in PanelView mode. Limited to what the headset renders.",
+                    new AcceptableValueRange<float>(30f, 170f)));
             ClearDesktopEachFrame = config.Bind("Fixes", "Clear Desktop Each Frame", true,
                 "Clears the game window every frame. Stops old UI images being left behind as 'ghosts' or trails on the desktop.");
 

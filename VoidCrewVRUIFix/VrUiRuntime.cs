@@ -29,6 +29,7 @@ namespace VoidCrewVRUIFix
         private float _nextDisplayAttempt;
         private Vector3 _cameraPosition;
         private Quaternion _cameraRotation = Quaternion.identity;
+        private static bool _quitting;
 
         public UiCapture Capture { get { return _capture; } }
         public IUiDisplay Display { get { return _display; } }
@@ -40,11 +41,19 @@ namespace VoidCrewVRUIFix
         private void Awake()
         {
             _cursor = new CursorOverlay(transform);
+            Application.quitting += () => _quitting = true;
+
+            // Order inside each frame: headset image into the desktop picture, capture the UI, then put the UI on
+            // the desktop picture and send it to the headset display.
             _capture.TextureCreated = texture => { if (_display != null) _display.SetTexture(texture); };
-            _capture.AfterCapture = commands => { if (_display != null) _display.AppendSubmit(commands); };
             _capture.FrameRendered = (context, camera) =>
             {
-                if (Settings.DesktopView.Value == DesktopViewMode.PanelView) _desktop.Draw(context, camera);
+                if (Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.DrawScene(context, camera);
+            };
+            _capture.AfterCapture = (commands, ui) =>
+            {
+                if (Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.Composite(commands, ui);
+                if (_display != null) _display.AppendSubmit(commands);
             };
         }
 
@@ -65,6 +74,7 @@ namespace VoidCrewVRUIFix
         private void OnDestroy()
         {
             _capture.Release();
+            _desktop.Release();
         }
 
         private void Update()
@@ -191,9 +201,13 @@ namespace VoidCrewVRUIFix
             _vrActive = false;
             _capture.Enabled = false;
             StopDisplay(null);
+            MarkerAlignment.Active = false;
+
+            // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
+            if (_quitting) return;
+
             _canvases.RestoreAll();
             _cursor.Update(false);
-            MarkerAlignment.Active = false;
             GamePatches.RefreshHardwareCursor();
             Log.Info("VR stopped. The normal desktop UI is restored.");
         }

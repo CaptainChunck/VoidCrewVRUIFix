@@ -98,7 +98,7 @@ BepInEx
 
 1. Start **SteamVR** (or your headset's VR software).
 2. Start **Void Crew** from Steam as normal, or with **Start Game Executable** on its page in Rai Pal.
-3. Click on the **game window** so it has keyboard and mouse focus, and play from there. SteamVR's "VR View" window is a separate program, so it can't send keyboard and mouse input to the game.
+3. Click on the **game window** so it has keyboard and mouse focus, and play from there. The game window shows what the headset shows, with the UI and cursor on top. SteamVR's "VR View" window is a separate program, so it can't send keyboard and mouse input to the game. If you want to watch VR View as well, set the game to windowed mode in its graphics settings and put the two windows side by side.
 
 ## Hotkeys
 
@@ -139,7 +139,8 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Menu Backdrop Opacity | 0 | Darkens the panel behind menus if text is hard to read against bright scenes (try 0.3) |
 | Cursor → Cursor Scale | 1 | Size of the VR cursor |
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
-| Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (the VR view with the UI and cursor, plays like the normal game), `HeadsetMirror` (SteamVR's zoomed mirror, no UI) or `UiOnly` |
+| Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (what the headset shows, with the UI panel and cursor where they appear in VR), `HeadsetMirror` (Unity's zoomed mirror, no UI) or `UiOnly` |
+| Fixes → Desktop View Width (degrees) | 90 | How wide a view the game window shows in `PanelView` |
 
 Every setting has a description in the file.
 

@@ -27,7 +27,7 @@ namespace VoidCrewVRUIFix
         public Action<RenderTexture> TextureCreated;
 
         /// <summary>Called inside the render context right after the UI was drawn, so displays can queue their submit.</summary>
-        public Action<CommandBuffer> AfterCapture;
+        public Action<CommandBuffer, RenderTexture> AfterCapture;
 
         /// <summary>Called inside the render context once the frame's headset images are finished, before the capture.</summary>
         public Action<ScriptableRenderContext, Camera> FrameRendered;
@@ -113,7 +113,7 @@ namespace VoidCrewVRUIFix
             try
             {
                 context.DrawUIOverlay(screenCamera);
-                if (AfterCapture != null) AfterCapture(_commands);
+                if (AfterCapture != null) AfterCapture(_commands, Texture);
                 context.ExecuteCommandBuffer(_commands);
                 _commands.Clear();
                 context.Submit();

@@ -120,16 +120,9 @@ namespace VoidCrewVRUIFix
 
         protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
         {
-            // uGUI's default material is always present in the build, needs no HDRP setup and can ignore depth.
-            _material = new Material(Canvas.GetDefaultCanvasMaterial())
-            {
-                name = "VoidCrewVRUIFix Panel",
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            _material.SetInt("unity_GUIZTestMode", (int)CompareFunction.Always);
-            _material.SetVector("_TextureSampleAdd", Vector4.zero);
-            _quad = CreateQuad(false);
-            _flippedQuad = CreateQuad(true);
+            _material = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Panel");
+            _quad = RenderUtil.CreateQuad(false);
+            _flippedQuad = RenderUtil.CreateQuad(true);
         }
 
         protected override void Execute(CustomPassContext ctx)
@@ -191,31 +184,6 @@ namespace VoidCrewVRUIFix
             view = xr.GetViewMatrix(0);
             projection = xr.GetProjMatrix(0);
             return true;
-        }
-
-        private static Mesh CreateQuad(bool flipped)
-        {
-            float bottom = flipped ? 1f : 0f;
-            float top = flipped ? 0f : 1f;
-            var mesh = new Mesh
-            {
-                name = flipped ? "VoidCrewVRUIFix Quad (flipped)" : "VoidCrewVRUIFix Quad",
-                hideFlags = HideFlags.HideAndDontSave,
-                vertices = new[]
-                {
-                    new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
-                    new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f)
-                },
-                uv = new[]
-                {
-                    new Vector2(0f, bottom), new Vector2(1f, bottom),
-                    new Vector2(1f, top), new Vector2(0f, top)
-                },
-                colors = new[] { Color.white, Color.white, Color.white, Color.white },
-                triangles = new[] { 0, 2, 1, 0, 3, 2 }
-            };
-            mesh.UploadMeshData(true);
-            return mesh;
         }
     }
 }
