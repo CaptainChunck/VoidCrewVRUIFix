@@ -153,7 +153,9 @@ namespace VoidCrewVRUIFix
 
             // The game shows the cursor exactly when a menu, popup or terminal wants mouse input.
             bool menuOpen = UnityEngine.Cursor.visible && UnityEngine.Cursor.lockState != CursorLockMode.Locked;
-            _capture.BackdropOpacity = menuOpen ? Settings.MenuBackdropOpacity.Value : 0f;
+            // A terminal's screen is part of the world, so it isn't darkened like a menu.
+            _capture.BackdropOpacity = menuOpen && !PanelLayout.OnTerminalScreen ? Settings.MenuBackdropOpacity.Value : 0f;
+            _desktop.UiInSceneImage = _display is InGamePanelDisplay;
             _cursor.Update(Settings.ShowVrCursor.Value && menuOpen);
             IntroVideo.Update();
 
@@ -189,6 +191,7 @@ namespace VoidCrewVRUIFix
                     Transform cameraTransform = _mainCamera.transform;
                     _cameraPosition = cameraTransform.position;
                     _cameraRotation = cameraTransform.rotation;
+                    TerminalScreens.PlacePanel(_cameraPosition, _cameraRotation);
                 }
 
                 if (_display != null)
@@ -254,6 +257,7 @@ namespace VoidCrewVRUIFix
             _pictureShown = true;
             _pictureForHeadsetOff = false;
             VrPerformance.OnVrStopped();
+            PanelLayout.LeaveTerminal();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;

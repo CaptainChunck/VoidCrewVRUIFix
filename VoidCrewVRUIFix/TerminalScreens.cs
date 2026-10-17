@@ -12,7 +12,9 @@ namespace VoidCrewVRUIFix
     /// attaches the terminal's screen to the camera, so it stays perfectly still on a monitor. In VR, UUVR turns the
     /// camera with your head, so the attached screen turned with it: it floated in front of your eyes wherever you
     /// looked and slid through the terminal and the walls around it. While VR is on, the screen now stays where it is,
-    /// and mouse clicks are mapped onto it in a way that doesn't need it attached to the camera.
+    /// and mouse clicks are mapped onto it in a way that doesn't need it attached to the camera. While the terminal is
+    /// in use, the VR UI panel (the mouse pointer and the button hints) sits on the terminal's screen, at its depth and
+    /// size, so the pointer is on the screen itself instead of floating in front of or behind it.
     /// </summary>
     internal static class TerminalScreens
     {
@@ -24,6 +26,11 @@ namespace VoidCrewVRUIFix
         private static bool _screenSizeResolved;
         private static FieldInfo _panelWidth;
         private static FieldInfo _panelHeight;
+        private static Type _worldSpaceUiType;
+        private static Component _activeScreen;
+        private static bool _playerLookupDone;
+        private static PropertyInfo _localPlayer;
+        private static PropertyInfo _isInTerminal;
 
         public static int KeptInWorld { get; private set; }
 
@@ -49,13 +56,97 @@ namespace VoidCrewVRUIFix
                 var navigatable = _navigatableUi != null ? _navigatableUi.GetValue(terminal) as NavigatableUI : null;
                 if (navigatable != null) navigatable.OnEnterUI();
             });
+            Run("Finding the terminal's screen", () => _activeScreen = FindScreen(terminal, "worldSpaceUI"));
         }
 
-        /// <summary>The game's ship-terminal coroutine only attaches the screen to the camera, so nothing is left to do.</summary>
+        /// <summary>
+        /// The game's ship-terminal coroutine only attaches the screen to the camera, so all that is left is noting
+        /// which screen is in use once the camera has arrived (the same 0.75 s).
+        /// </summary>
         public static IEnumerator EnterShipTerminal(MonoBehaviour terminal)
         {
             Kept(terminal);
-            yield break;
+            yield return new WaitForSeconds(GameDelay);
+            Run("Finding the ship terminal's screen", () => _activeScreen = FindScreen(terminal, "worldUiPanel"));
+        }
+
+        /// <summary>
+        /// Once per frame, before rendering, with the game camera's own pose (no head rotation): while a terminal is in
+        /// use, puts the VR UI panel on its screen; otherwise puts the panel back.
+        /// </summary>
+        public static void PlacePanel(Vector3 cameraPosition, Quaternion cameraRotation)
+        {
+            Transform screen = Settings.SnapUiToTerminalScreens.Value && Settings.Anchor.Value == PanelAnchor.GameCamera ? CurrentScreen() : null;
+            if (screen == null)
+            {
+                if (PanelLayout.LeaveTerminal()) Log.Verbose("The VR UI panel is back where the settings put it.");
+                return;
+            }
+
+            // The screen is a 1 x 1 quad scaled to its size; its corners are at local (+-0.5, +-0.5).
+            Quaternion toCamera = Quaternion.Inverse(cameraRotation);
+            Vector3 centre = toCamera * (screen.position - cameraPosition);
+            float halfWidth = (screen.TransformPoint(0.5f, 0f, 0f) - screen.position).magnitude;
+            float halfHeight = (screen.TransformPoint(0f, 0.5f, 0f) - screen.position).magnitude;
+            if (centre.z < 0.15f || centre.z > 6f || halfWidth < 0.01f || halfHeight < 0.01f)
+            {
+                PanelLayout.LeaveTerminal();
+                return;
+            }
+
+            // The panel has the game window's shape; make it cover the whole terminal screen.
+            float tanHalfWidth = Mathf.Max(halfWidth / centre.z, halfHeight / centre.z * PanelLayout.Aspect);
+            float widthDegrees = Mathf.Clamp(2f * Mathf.Atan(tanHalfWidth) * Mathf.Rad2Deg, 20f, 140f);
+            if (PanelLayout.PlaceOnTerminal(centre.z, widthDegrees, centre.y))
+            {
+                Log.InfoOnce("terminal-panel", "While you use a terminal, the VR UI panel (mouse pointer and button hints) sits on the terminal's screen.");
+                Log.Verbose(string.Format("VR UI panel moved onto the terminal screen: {0:0.00} m away, {1:0}° wide.", centre.z, widthDegrees));
+            }
+        }
+
+        /// <summary>The screen of the terminal in use, or null once the player has left it.</summary>
+        private static Transform CurrentScreen()
+        {
+            if (_activeScreen == null) return null;
+            if (!_activeScreen.gameObject.activeInHierarchy || !PlayerIsInTerminal())
+            {
+                _activeScreen = null;
+                return null;
+            }
+            return _activeScreen.transform;
+        }
+
+        /// <summary>The game's own "using a terminal" flag on the local player (read by name; the player class is networked).</summary>
+        private static bool PlayerIsInTerminal()
+        {
+            if (!_playerLookupDone)
+            {
+                _playerLookupDone = true;
+                Type localPlayer = AccessTools.TypeByName("CG.Game.Player.LocalPlayer");
+                _localPlayer = localPlayer != null ? AccessTools.Property(localPlayer, "I") : null;
+                _isInTerminal = localPlayer != null ? AccessTools.Property(localPlayer, "IsInTerminal") : null;
+                if (_localPlayer == null || _isInTerminal == null)
+                {
+                    Log.Warn("The game's terminal flag was not found (the game may have been updated); the VR UI panel won't move onto terminal screens.");
+                }
+            }
+            if (_localPlayer == null || _isInTerminal == null) return false;
+
+            var player = _localPlayer.GetValue(null, null) as UnityEngine.Object;
+            return player != null && (bool)_isInTerminal.GetValue(player, null);
+        }
+
+        /// <summary>The terminal's screen: the game's WorldSpaceUI component on (or under) the given field's object.</summary>
+        private static Component FindScreen(MonoBehaviour terminal, string fieldName)
+        {
+            if (terminal == null) return null;
+            if (_worldSpaceUiType == null) _worldSpaceUiType = AccessTools.TypeByName("CG.Client.UI.Terminals.WorldSpaceUI");
+            FieldInfo field = AccessTools.Field(terminal.GetType(), fieldName);
+            var holder = field != null ? field.GetValue(terminal) as Component : null;
+            if (holder == null || _worldSpaceUiType == null) return null;
+            Component screen = holder.GetComponentInChildren(_worldSpaceUiType, true);
+            if (screen == null) Log.Verbose("Terminal '" + terminal.name + "' has no world-space screen; the VR UI panel stays where it is.");
+            return screen;
         }
 
         /// <summary>

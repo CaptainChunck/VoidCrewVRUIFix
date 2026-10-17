@@ -20,6 +20,7 @@ namespace VoidCrewVRUIFix
         private Mesh _quad;
         private Rect _uiRect = new Rect(0f, 0f, 1f, 1f);
         private bool _sceneReady;
+        private bool _sceneDrawn;
 
         private Material _fillMaterial;
 
@@ -30,6 +31,12 @@ namespace VoidCrewVRUIFix
 
         /// <summary>Colour to fill the whole picture with behind the UI while a full-screen UI layer shows.</summary>
         public Color Fill;
+
+        /// <summary>
+        /// True when the UI is drawn into the headset image (the in-game panel), so the headset image already shows it
+        /// and drawing it again would double it.
+        /// </summary>
+        public bool UiInSceneImage;
 
         public string Describe()
         {
@@ -46,6 +53,7 @@ namespace VoidCrewVRUIFix
             _commands.Clear();
             _uiRect = new Rect(0f, 0f, 1f, 1f);
             bool sceneDrawn = Settings.DesktopView.Value == DesktopViewMode.PanelView && TryAddEyeImage(camera);
+            _sceneDrawn = sceneDrawn;
             if (!sceneDrawn)
             {
                 _commands.SetRenderTarget(_frame);
@@ -67,7 +75,8 @@ namespace VoidCrewVRUIFix
 
             commands.SetRenderTarget(_frame);
             commands.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.Ortho(0f, 1f, 0f, 1f, -1f, 1f));
-            if (Fill.a > 0.003f)
+            bool uiAlreadyShown = UiInSceneImage && _sceneDrawn;
+            if (Fill.a > 0.003f && !uiAlreadyShown)
             {
                 if (_fillMaterial == null)
                 {
@@ -78,7 +87,7 @@ namespace VoidCrewVRUIFix
                 commands.DrawMesh(_quad, Matrix4x4.TRS(new Vector3(0.5f, 0.5f, 0f), Quaternion.identity, Vector3.one), _fillMaterial, 0, 0);
             }
 
-            if (ui != null)
+            if (ui != null && !uiAlreadyShown)
             {
                 _uiMaterial.mainTexture = ui;
                 commands.DrawMesh(_quad,

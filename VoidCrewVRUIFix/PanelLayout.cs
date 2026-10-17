@@ -9,11 +9,53 @@ namespace VoidCrewVRUIFix
     /// </summary>
     internal static class PanelLayout
     {
-        public static float Distance { get { return Mathf.Clamp(Settings.PanelDistance.Value, 0.3f, 10f); } }
+        // While a terminal is in use the panel sits on the terminal's screen (see TerminalScreens), so the mouse
+        // pointer and the button hints are on the screen itself, like on a monitor.
+        private static bool _onTerminal;
+        private static float _terminalDistance;
+        private static float _terminalWidthDegrees;
+        private static float _terminalHeightOffset;
 
-        public static float WidthDegrees { get { return Mathf.Clamp(Settings.PanelWidthDegrees.Value, 20f, 140f); } }
+        public static bool OnTerminalScreen { get { return _onTerminal; } }
 
-        public static float HeightOffset { get { return Settings.PanelHeightOffset.Value; } }
+        public static float Distance
+        {
+            get { return _onTerminal ? _terminalDistance : Mathf.Clamp(Settings.PanelDistance.Value, 0.3f, 10f); }
+        }
+
+        public static float WidthDegrees
+        {
+            get { return _onTerminal ? _terminalWidthDegrees : Mathf.Clamp(Settings.PanelWidthDegrees.Value, 20f, 140f); }
+        }
+
+        public static float HeightOffset
+        {
+            get { return _onTerminal ? _terminalHeightOffset : Settings.PanelHeightOffset.Value; }
+        }
+
+        /// <summary>
+        /// Puts the panel onto a terminal screen. Changes under a centimetre or a quarter degree are ignored, so the
+        /// panel doesn't jitter. Returns true when the panel has just moved onto a terminal.
+        /// </summary>
+        public static bool PlaceOnTerminal(float distance, float widthDegrees, float heightOffset)
+        {
+            if (_onTerminal && Mathf.Abs(distance - _terminalDistance) < 0.01f && Mathf.Abs(widthDegrees - _terminalWidthDegrees) < 0.25f &&
+                Mathf.Abs(heightOffset - _terminalHeightOffset) < 0.01f) return false;
+            bool arrived = !_onTerminal;
+            _onTerminal = true;
+            _terminalDistance = distance;
+            _terminalWidthDegrees = widthDegrees;
+            _terminalHeightOffset = heightOffset;
+            return arrived;
+        }
+
+        /// <summary>Puts the panel back where the settings say. Returns true if it was on a terminal.</summary>
+        public static bool LeaveTerminal()
+        {
+            bool was = _onTerminal;
+            _onTerminal = false;
+            return was;
+        }
 
         public static float Aspect
         {
@@ -30,8 +72,8 @@ namespace VoidCrewVRUIFix
 
         public static string Describe()
         {
-            return string.Format("{0:0}° wide ({1:0.00} x {2:0.00} m) at {3:0.0} m, anchor {4}, height offset {5:0.00} m",
-                WidthDegrees, WidthMeters, HeightMeters, Distance, Settings.Anchor.Value, HeightOffset);
+            return string.Format("{0:0}° wide ({1:0.00} x {2:0.00} m) at {3:0.0} m, anchor {4}, height offset {5:0.00} m{6}",
+                WidthDegrees, WidthMeters, HeightMeters, Distance, Settings.Anchor.Value, HeightOffset, _onTerminal ? ", on a terminal screen" : "");
         }
     }
 
