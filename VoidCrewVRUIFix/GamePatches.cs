@@ -38,8 +38,10 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "CG.Client.Ship.Modules.Mediators.TerminalModuleMediator", "DelayedParentWorldUiPanel", nameof(ShipTerminalEntered), null,
                 "ship terminal screens", applied, skipped);
             Patch(harmony, "CG.Client.UI.Terminals.WorldSpaceUI", "TransformPointerEvent", nameof(TerminalScreenPointer), null, "terminal screen clicks", applied, skipped);
-            // DLSS can only be picked when it is allowed, and changing that needs a restart.
-            if (!Settings.DisableDlss.Value) PatchDlssEyes(harmony, applied, skipped);
+            // Always on, even when DLSS is hidden from the options: if DLSS still ends up running in VR (for example a
+            // setting saved before the plugin was installed), HDRP's DLSS fails on every frame without it, and the
+            // headset shows nothing.
+            PatchDlssEyes(harmony, applied, skipped);
             if (UuvrCompat.Installed) PatchUuvrStartup(harmony, applied, skipped);
 
             // Both overloads of each are patched: the one-argument versions are small enough to be inlined into game code.
@@ -86,8 +88,17 @@ namespace VoidCrewVRUIFix
         private static void Patch(Harmony harmony, string typeName, string methodName, string prefix, string postfix,
             string label, List<string> applied, List<string> skipped)
         {
-            Type type = AccessTools.TypeByName(typeName);
-            MethodInfo target = type != null ? AccessTools.DeclaredMethod(type, methodName) : null;
+            MethodInfo target;
+            try
+            {
+                Type type = AccessTools.TypeByName(typeName);
+                target = type != null ? AccessTools.DeclaredMethod(type, methodName) : null;
+            }
+            catch (Exception e)
+            {
+                skipped.Add(label + " (" + e.GetType().Name + ": " + e.Message + ")");
+                return;
+            }
             if (target == null)
             {
                 skipped.Add(label + " (" + typeName + "." + methodName + " not found)");
@@ -107,18 +118,28 @@ namespace VoidCrewVRUIFix
 
             try
             {
-                harmony.Patch(target,
-                    prefix != null ? new HarmonyMethod(typeof(GamePatches), prefix) : null,
-                    postfix != null ? new HarmonyMethod(typeof(GamePatches), postfix) : null,
-                    null,
-                    finalizer != null ? new HarmonyMethod(typeof(GamePatches), finalizer) : null,
-                    null);
+                ApplyPatch(harmony, target, prefix, postfix, finalizer);
                 applied.Add(label);
             }
             catch (Exception e)
             {
                 skipped.Add(label + " (" + e.GetType().Name + ": " + e.Message + ")");
             }
+        }
+
+        /// <summary>
+        /// Harmony's PatchProcessor works the same in every Harmony 2 version, unlike the overloads of Harmony.Patch,
+        /// which differ between the HarmonyX versions that different BepInEx installs ship. Kept in its own method so
+        /// that even a Harmony method missing on a player's PC is caught as a failure of this one patch.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ApplyPatch(Harmony harmony, MethodBase target, string prefix, string postfix, string finalizer)
+        {
+            PatchProcessor processor = harmony.CreateProcessor(target);
+            if (prefix != null) processor.AddPrefix(new HarmonyMethod(typeof(GamePatches), prefix));
+            if (postfix != null) processor.AddPostfix(new HarmonyMethod(typeof(GamePatches), postfix));
+            if (finalizer != null) processor.AddFinalizer(new HarmonyMethod(typeof(GamePatches), finalizer));
+            processor.Patch();
         }
 
         private static void PatchDlssEyes(Harmony harmony, List<string> applied, List<string> skipped)
