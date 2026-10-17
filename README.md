@@ -125,16 +125,21 @@ You don't need to change any other UUVR setting. The plugin turns off UUVR's own
 
 ## Settings
 
-The easiest way to change the VR settings is in the game itself: open **Settings** and pick the **VR** tab (next to GRAPHICS). Changes apply straight away, so you can see the result in the headset:
+The easiest way to change the VR settings is in the game itself: open **Settings** and pick the **VR** tab (next to GRAPHICS). Changes apply straight away, so you can see the result in the headset. Hover the **?** next to a setting to see what it does.
 
-- VR on/off, and which VR API UUVR uses (OpenXR or OpenVR; needs a game restart)
-- UI display mode (SteamVR overlay or in-game panel), UI size, distance and height
-- Whether the UI follows your head
-- Menu background dimming and VR cursor size
-- Level horizon (UUVR's horizon lock)
-- What the game window on your monitor shows, and how wide a view it shows
-- Control from SteamVR's VR View window (for testing without a headset)
-- Allow DLSS (experimental): restart the game, then choose DLSS under Graphics > Upscaling
+| VR tab setting | What it does |
+| --- | --- |
+| VR on / off (this session) | Turns VR off or back on without restarting, like UUVR's F3 key. The game always starts in VR |
+| VR system (needs restart) | Which VR system UUVR uses. OpenVR (SteamVR) is recommended |
+| UI shown as | Automatic, SteamVR overlay (sharpest) or drawn into the game image (also works with OpenXR) |
+| UI screen size, distance, height | How big the floating UI screen looks, how far away it is, and how high |
+| UI screen follows your head | On: the UI stays in front of your eyes. Off: it stays in front of the game camera, so markers line up with the world |
+| Darken world behind menus | Puts a dark layer over the world while a menu or terminal is open, to make text easier to read. Off by default |
+| VR mouse pointer size | Size of the mouse pointer on the UI screen |
+| Keep horizon level (UUVR) | The game only turns you left and right; you look up and down with your head |
+| Monitor window shows, view width | What the game window on your monitor shows while you play in VR, and how much of the view |
+| Allow DLSS (experimental, needs restart) | Puts DLSS back in Graphics > Upscaling. See [Frame rate in VR](#frame-rate-in-vr) |
+| Testing: control from SteamVR VR View | Only for testing without a headset (SteamVR's null driver). Leave it off with a real headset |
 
 <!-- SCREENSHOT: docs/images/vr-settings-tab.png (the VR tab in the game's Settings menu)
 ![The VR tab in the game's Settings menu](docs/images/vr-settings-tab.png)
@@ -152,14 +157,24 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Width (degrees) | 70 | How much of your view the panel covers |
 | UI Panel → Height Offset | 0 | Moves the panel up or down, in metres |
 | UI Panel → Anchor | GameCamera | `GameCamera` keeps the panel in front of the in-game view, so markers line up and you can look around it. `Head` locks it to your head |
-| UI Panel → Menu Backdrop Opacity | 0 | Darkens the panel behind menus if text is hard to read against bright scenes (try 0.3) |
+| UI Panel → Menu Backdrop Opacity | 0 | Darkens the world behind menus if text is hard to read against bright scenes (try 0.3). At 1 the world behind menus is completely black |
 | Cursor → Cursor Scale | 1 | Size of the VR cursor |
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
 | Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (what the headset shows, with the UI panel and cursor where they appear in VR), `HeadsetMirror` (Unity's zoomed mirror, no UI) or `UiOnly` |
 | Fixes → Desktop View Width (degrees) | 90 | How wide a view the game window shows in `PanelView` |
-| Testing → Control From VR View | true | While SteamVR's VR View window is focused, your keyboard, mouse buttons and mouse-look still control the game (handy for testing without a headset; the scroll wheel isn't passed through) |
+| Testing → Control From VR View | false | Testing only, for SteamVR's null driver (no headset): while SteamVR's VR View window is focused, your keyboard and mouse still control the game. Typing into text boxes and the scroll wheel aren't passed through |
 
 Every setting has a description in the file.
+
+## Frame rate in VR
+
+SteamVR shows a new picture on every refresh of the headset, for example 90 times a second. When the game can't finish a frame in time, SteamVR runs it at half or a third of that rate and repeats frames, so the frame rate locks to steps like **45** or **30 FPS** on a 90 Hz headset. To get a higher step, the game has to draw each frame faster:
+
+- **Lower SteamVR's render resolution:** in SteamVR's settings, open **Video** and set **Render Resolution** to Custom 100% or lower. Each step down makes every frame cheaper to draw.
+- **Use DLSS** (NVIDIA RTX cards): turn on **Allow DLSS** in the VR tab, restart the game, then choose **DLSS** under Graphics > Upscaling. Its Performance and Ultra Performance modes give the biggest gain.
+- **Lower the game's graphics settings**, like shadows and volumetric lighting.
+
+Press **F9** in game to check: the **Performance** section of the report shows how long the GPU takes per frame, how often SteamVR repeats each frame, and whether DLSS is running and at what resolution.
 
 ## Reporting a problem
 

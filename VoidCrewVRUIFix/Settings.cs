@@ -66,7 +66,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> VerboseLogging;
         private static ConfigEntry<int> _settingsVersion;
 
-        private const int CurrentSettingsVersion = 2;
+        private const int CurrentSettingsVersion = 3;
 
         public static void Bind(ConfigFile config)
         {
@@ -92,7 +92,8 @@ namespace VoidCrewVRUIFix
                 "GameCamera: the panel stays in front of the in-game view direction, so you can look around it and markers line up with the world.\n" +
                 "Head: the panel is locked to your head and always stays in front of your eyes.");
             MenuBackdropOpacity = config.Bind("UI Panel", "Menu Backdrop Opacity", 0f,
-                new ConfigDescription("Darkens the whole panel behind menus (only while the mouse cursor is shown). 0 = off. Try 0.3 if menu text is hard to read against bright scenes.",
+                new ConfigDescription("Darkens the game world behind menus and terminals while one is open (shown as 'Darken World Behind Menus' in the VR tab). " +
+                    "0 = off. Try 0.3 if menu text is hard to read against bright scenes. At 1 the world behind menus is completely black; the VR tab stops at 0.8.",
                     new AcceptableValueRange<float>(0f, 1f)));
             FlipVertically = config.Bind("UI Panel", "Flip Vertically", false,
                 "Turn on if the UI appears upside down in the headset. Can also be toggled in game with the Flip UI hotkey.");
@@ -140,9 +141,9 @@ namespace VoidCrewVRUIFix
             KeyDiagnostics = config.Bind("Hotkeys", "Write Diagnostics", Key.F9,
                 "Writes a detailed diagnostics report to the BepInEx log and saves a picture of the VR UI texture. Include both when reporting a problem.");
 
-            ControlFromVrView = config.Bind("Testing", "Control From VR View", true,
-                "While SteamVR's VR View window is the focused window, pass your keyboard, mouse buttons and mouse-look to the game. " +
-                "Useful for testing without a headset. Has no effect while the game window itself is focused.");
+            ControlFromVrView = config.Bind("Testing", "Control From VR View", false,
+                "Testing only, for SteamVR's null driver (no headset). While SteamVR's VR View window is the focused window, pass your keyboard, " +
+                "mouse and mouse-look to the game. Leave this off when you play with a real headset.");
 
             SubmitOverlayOnRenderThread = config.Bind("Debug", "Submit Overlay On Render Thread", true,
                 "Advanced. Sends the UI image to SteamVR from Unity's render thread (correct ordering). Turn off only if the game crashes when the SteamVR overlay is used.");
@@ -158,7 +159,7 @@ namespace VoidCrewVRUIFix
         public static string Describe()
         {
             return string.Format(
-                "UI {0:0}° wide at {1:0.0} m (anchor {2}, height {3:0.00} m), display {4}, menu dimming {5:0.00}, cursor x{6:0.0}, " +
+                "UI {0:0}° wide at {1:0.0} m (anchor {2}, height {3:0.00} m), display {4}, darken behind menus {5:0%}, cursor x{6:0.0}, " +
                 "game window {7} {8:0}° wide, DLSS {9}, control from VR View {10}",
                 PanelWidthDegrees.Value, PanelDistance.Value, Anchor.Value, PanelHeightOffset.Value, DisplayMode.Value,
                 MenuBackdropOpacity.Value, CursorScale.Value, DesktopView.Value, DesktopViewWidth.Value,
@@ -176,6 +177,13 @@ namespace VoidCrewVRUIFix
                 // 3.0.0 darkened the panel behind menus by default, which showed as a grey box.
                 MenuBackdropOpacity.Value = 0f;
                 Log.Info("Settings updated from an older version: Menu Backdrop Opacity 0.5 -> 0 (new default).");
+            }
+            if (version < 3 && MenuBackdropOpacity.Value >= 0.95f)
+            {
+                // The old VR tab slider was named "Menu Background Dimming" and went to 100%, which turns everything
+                // behind menus black (the main menu looked broken). The VR tab now stops at 80%.
+                MenuBackdropOpacity.Value = 0f;
+                Log.Info("Settings updated from an older version: Menu Backdrop Opacity 1 -> 0. At 100% the world behind menus was completely black.");
             }
             _settingsVersion.Value = CurrentSettingsVersion;
         }

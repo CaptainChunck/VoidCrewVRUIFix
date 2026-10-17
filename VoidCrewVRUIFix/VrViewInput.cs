@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using HarmonyLib;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
@@ -9,39 +11,74 @@ using UnityEngine.InputSystem.LowLevel;
 namespace VoidCrewVRUIFix
 {
     /// <summary>
-    /// Testing aid: lets you play while SteamVR's "VR View" window is the focused window (handy with no headset).
-    /// Windows only sends keyboard and mouse clicks to the focused window, so while VR View is in front the plugin
-    /// reads the keys and mouse buttons itself and passes them to the game. When the game wants mouse-look, the
-    /// mouse is also turned into look movement and kept inside the VR View window. Does nothing in any other case.
+    /// Testing aid for SteamVR's null (no headset) driver: lets you play while SteamVR's "VR View" window is the
+    /// focused window. Windows only sends keyboard and mouse input to the focused window, so while VR View is in
+    /// front the plugin reads the keys, mouse buttons and pointer itself and passes them to the game. When the game
+    /// wants mouse-look, the mouse is turned into look movement and kept inside the VR View window.
+    /// Two parts of the game stop listening the moment its window loses focus, so both are kept going while this
+    /// setting is on: Unity's input system switches the keyboard and mouse off, and the character controller
+    /// (Opsive) stops reading mouse-look. Does nothing while the setting is off.
     /// </summary>
     internal sealed class VrViewInput
     {
         private const int VkLeftButton = 0x01;
         private const int VkRightButton = 0x02;
         private const int VkMiddleButton = 0x04;
+        private const float CharacterInputSearchInterval = 1f;
 
         private static readonly KeyValuePair<Key, int>[] KeyMap = BuildKeyMap();
+        private static readonly object BoxedTrue = true;
 
         private IntPtr _checkedWindow;
         private bool _checkedWindowIsVrView;
         private bool _active;
+        private bool _keepingDevices;
         private InputSettings.BackgroundBehavior _previousBehaviour;
+        private bool _wasFocused = true;
         private bool _lookCaptured;
+        private IntPtr _gameWindow;
+
+        private bool _characterInputResolved;
+        private Type _characterInputType;
+        private FieldInfo _characterInputFocus;
+        private UnityEngine.Object[] _characterInputs = new UnityEngine.Object[0];
+        private float _nextCharacterInputSearch;
 
         public bool Active { get { return _active; } }
 
         public void Update()
         {
-            bool shouldRun = Settings.ControlFromVrView.Value && !Application.isFocused && IsVrViewInFront();
+            bool enabled = Settings.ControlFromVrView.Value;
+            if (enabled != _keepingDevices) KeepDevicesWhileUnfocused(enabled);
+            if (!enabled)
+            {
+                if (_active) Stop();
+                return;
+            }
+
+            bool focused = Application.isFocused;
+            if (focused) _gameWindow = GetForegroundWindow();
+
+            bool shouldRun = !focused && IsVrViewInFront();
             if (shouldRun != _active)
             {
                 if (shouldRun) Start();
                 else Stop();
             }
+            else if (_wasFocused && !focused && !_active)
+            {
+                // The game lost focus to another program. Unity no longer clears held keys by itself while this
+                // setting is on, so let go of everything rather than leave a key stuck down.
+                ReleaseAll();
+            }
+            _wasFocused = focused;
             if (!_active) return;
 
             try
             {
+                EnableDevice(Keyboard.current);
+                EnableDevice(Mouse.current);
+                KeepCharacterLookActive();
                 SendKeyboard(false);
                 SendMouse(false);
             }
@@ -55,14 +92,28 @@ namespace VoidCrewVRUIFix
         public void Shutdown()
         {
             if (_active) Stop();
+            if (_keepingDevices) KeepDevicesWhileUnfocused(false);
+        }
+
+        private void KeepDevicesWhileUnfocused(bool keep)
+        {
+            _keepingDevices = keep;
+            if (keep)
+            {
+                // Unity normally switches the keyboard and mouse off as soon as the game window loses focus, and
+                // switching the setting afterwards doesn't turn them back on. So it is changed before that happens.
+                _previousBehaviour = InputSystem.settings.backgroundBehavior;
+                InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            }
+            else
+            {
+                InputSystem.settings.backgroundBehavior = _previousBehaviour;
+            }
         }
 
         private void Start()
         {
             _active = true;
-            // Unity normally ignores keyboard and mouse while the game window isn't focused.
-            _previousBehaviour = InputSystem.settings.backgroundBehavior;
-            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             Log.Info("SteamVR's VR View window is focused: passing your keyboard and mouse to the game (Testing > Control From VR View).");
         }
 
@@ -70,9 +121,15 @@ namespace VoidCrewVRUIFix
         {
             _active = false;
             _lookCaptured = false;
+            ReleaseAll();
+            Log.Verbose("Stopped passing VR View input to the game.");
+        }
+
+        /// <summary>Releases every key and button, so nothing stays stuck down.</summary>
+        private void ReleaseAll()
+        {
             try
             {
-                // Release everything that was held, so no key or button stays stuck down.
                 SendKeyboard(true);
                 SendMouse(true);
             }
@@ -80,14 +137,48 @@ namespace VoidCrewVRUIFix
             {
                 Log.Failure("Releasing VR View input", e);
             }
-            InputSystem.settings.backgroundBehavior = _previousBehaviour;
-            Log.Verbose("Stopped passing VR View input to the game.");
+        }
+
+        private static void EnableDevice(InputDevice device)
+        {
+            // If the window lost focus before this setting was on, Unity has already switched the device off.
+            if (device != null && !device.enabled) InputSystem.EnableDevice(device);
+        }
+
+        /// <summary>
+        /// The character controller ignores mouse-look while the game window isn't focused, and only listens again
+        /// when a menu closes. That was why turning the camera stopped working at random.
+        /// </summary>
+        private void KeepCharacterLookActive()
+        {
+            if (!_characterInputResolved)
+            {
+                _characterInputResolved = true;
+                _characterInputType = AccessTools.TypeByName("Opsive.Shared.Input.PlayerInput");
+                _characterInputFocus = _characterInputType != null ? AccessTools.Field(_characterInputType, "m_Focus") : null;
+                if (_characterInputFocus == null || _characterInputFocus.FieldType != typeof(bool))
+                {
+                    _characterInputFocus = null;
+                    Log.WarnOnce("vrview-look", "Control From VR View: the game's character input was not found, so mouse-look may stop while VR View is focused.");
+                }
+            }
+            if (_characterInputFocus == null) return;
+
+            if (Time.unscaledTime >= _nextCharacterInputSearch)
+            {
+                _nextCharacterInputSearch = Time.unscaledTime + CharacterInputSearchInterval;
+                _characterInputs = UnityEngine.Object.FindObjectsOfType(_characterInputType);
+            }
+            foreach (UnityEngine.Object input in _characterInputs)
+            {
+                if (input != null) _characterInputFocus.SetValue(input, BoxedTrue);
+            }
         }
 
         private static void SendKeyboard(bool releaseAll)
         {
             Keyboard keyboard = Keyboard.current;
-            if (keyboard == null) return;
+            if (keyboard == null || !keyboard.enabled) return;
 
             InputEventPtr eventPtr;
             using (StateEvent.From(keyboard, out eventPtr))
@@ -104,21 +195,22 @@ namespace VoidCrewVRUIFix
         private void SendMouse(bool releaseAll)
         {
             Mouse mouse = Mouse.current;
-            if (mouse == null) return;
+            if (mouse == null || !mouse.enabled) return;
 
-            Vector2 look = Vector2.zero;
-            if (!releaseAll && UnityEngine.Cursor.lockState == CursorLockMode.Locked)
-            {
-                look = CaptureLookMovement();
-            }
-            else
-            {
-                _lookCaptured = false;
-            }
+            bool mouseLook = !releaseAll && UnityEngine.Cursor.lockState == CursorLockMode.Locked;
+            Vector2 look = mouseLook ? CaptureLookMovement() : Vector2.zero;
+            if (!mouseLook) _lookCaptured = false;
 
             InputEventPtr eventPtr;
             using (StateEvent.From(mouse, out eventPtr))
             {
+                // Windows sends pointer moves to the window under the pointer (VR View), so the game would never
+                // see the pointer move over its menus. Pass where it is, relative to the game window.
+                Vector2 position;
+                if (!releaseAll && !mouseLook && TryGetPointerInGameWindow(out position))
+                {
+                    mouse.position.WriteValueIntoEvent(position, eventPtr);
+                }
                 mouse.leftButton.WriteValueIntoEvent(!releaseAll && IsDown(VkLeftButton) ? 1f : 0f, eventPtr);
                 mouse.rightButton.WriteValueIntoEvent(!releaseAll && IsDown(VkRightButton) ? 1f : 0f, eventPtr);
                 mouse.middleButton.WriteValueIntoEvent(!releaseAll && IsDown(VkMiddleButton) ? 1f : 0f, eventPtr);
@@ -126,6 +218,33 @@ namespace VoidCrewVRUIFix
                 mouse.scroll.WriteValueIntoEvent(Vector2.zero, eventPtr);
                 InputSystem.QueueEvent(eventPtr);
             }
+        }
+
+        /// <summary>The pointer's position in the game's own screen coordinates (origin bottom left).</summary>
+        private bool TryGetPointerInGameWindow(out Vector2 position)
+        {
+            position = Vector2.zero;
+            if (_gameWindow == IntPtr.Zero)
+            {
+                using (Process process = Process.GetCurrentProcess()) _gameWindow = process.MainWindowHandle;
+            }
+
+            NativePoint pointer;
+            NativeRect client;
+            if (_gameWindow == IntPtr.Zero || !GetCursorPos(out pointer) || !ScreenToClient(_gameWindow, ref pointer) ||
+                !GetClientRect(_gameWindow, out client))
+            {
+                return false;
+            }
+
+            int width = client.Right - client.Left;
+            int height = client.Bottom - client.Top;
+            if (width <= 0 || height <= 0) return false;
+
+            float x = Mathf.Clamp(pointer.X, 0, width - 1) * (float)Screen.width / width;
+            float y = (height - 1 - Mathf.Clamp(pointer.Y, 0, height - 1)) * (float)Screen.height / height;
+            position = new Vector2(x, y);
+            return true;
         }
 
         /// <summary>
@@ -271,5 +390,11 @@ namespace VoidCrewVRUIFix
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr window, out NativeRect rect);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClientRect(IntPtr window, out NativeRect rect);
+
+        [DllImport("user32.dll")]
+        private static extern bool ScreenToClient(IntPtr window, ref NativePoint point);
     }
 }

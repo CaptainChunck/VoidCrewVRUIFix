@@ -4,6 +4,7 @@ using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
 namespace VoidCrewVRUIFix
@@ -25,14 +26,37 @@ namespace VoidCrewVRUIFix
         private static int _lastPassId;
         private static int _lastEye;
 
+        // What DLSS last did, so the diagnostics report can show whether it is really running.
+        private static Camera _runCamera;
+        private static int _runFrame = -1;
+        private static int _eyesThisFrame;
+        private static int _eyesLastFrame;
+        private static Vector2Int _renderSize;
+        private static Vector2Int _outputSize;
+
         public static bool Active { get; private set; }
         public static int RenumberedPasses { get; private set; }
 
         /// <summary>For the diagnostics report.</summary>
         public static string Describe()
         {
-            if (!Active) return "off";
-            return "on, " + RenumberedPasses + " eye passes renumbered" +
+            if (!Active) return "eye fix off";
+
+            string state;
+            if (_runCamera == null)
+            {
+                state = "not running (choose DLSS under Graphics > Upscaling)";
+            }
+            else if (Time.frameCount - _runFrame > 2)
+            {
+                state = "not running now (last ran " + (Time.frameCount - _runFrame) + " frames ago on '" + _runCamera.name + "')";
+            }
+            else
+            {
+                state = "running on '" + _runCamera.name + "' for " + Mathf.Max(_eyesThisFrame, _eyesLastFrame) + " eyes per frame, rendering " +
+                        _renderSize.x + "x" + _renderSize.y + " per eye and upscaling to " + _outputSize.x + "x" + _outputSize.y;
+            }
+            return state + "; eye fix on, " + RenumberedPasses + " eye passes renumbered" +
                    (_lastCamera != null ? " (last: '" + _lastCamera.name + "' pass " + _lastPassId + " -> eye " + _lastEye + ")" : "");
         }
 
@@ -56,6 +80,7 @@ namespace VoidCrewVRUIFix
         /// <summary>Before DLSS runs: gives the pass its eye number. Returns the id to put back afterwards, or -1.</summary>
         public static int UseEyeNumber(HDCamera hdCamera)
         {
+            RecordRun(hdCamera);
             XRPass pass = _xrOf(hdCamera);
             if (pass == null || !pass.enabled || pass.singlePassEnabled) return -1;
 
@@ -75,6 +100,22 @@ namespace VoidCrewVRUIFix
                          " as pass " + passId + ". DLSS now looks each eye up by its eye number, which stops its 'Index was out of range' errors.");
             }
             return passId;
+        }
+
+        private static void RecordRun(HDCamera hdCamera)
+        {
+            int frame = Time.frameCount;
+            if (frame != _runFrame)
+            {
+                _eyesLastFrame = _runFrame == frame - 1 ? _eyesThisFrame : 0;
+                _eyesThisFrame = 0;
+                _runFrame = frame;
+            }
+            _eyesThisFrame++;
+            _runCamera = hdCamera.camera;
+            _renderSize = new Vector2Int(hdCamera.actualWidth, hdCamera.actualHeight);
+            DynamicResolutionHandler resolution = DynamicResolutionHandler.instance;
+            if (resolution != null) _outputSize = resolution.finalViewport;
         }
 
         /// <summary>After DLSS ran (or failed): puts HDRP's own pass id back.</summary>

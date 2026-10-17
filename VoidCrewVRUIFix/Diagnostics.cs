@@ -51,6 +51,14 @@ namespace VoidCrewVRUIFix
                 : "not installed");
             Line(report, "Game state", GameStateName());
 
+            Section(report, "Performance");
+            Line(report, "Game", (1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f)).ToString("0") + " FPS (" + (Time.smoothDeltaTime * 1000f).ToString("0.0") +
+                                " ms per frame) | V-Sync " + QualitySettings.vSyncCount + ", frame limit " +
+                                (Application.targetFrameRate > 0 ? Application.targetFrameRate.ToString() : "none") +
+                                " | VR render scale " + XRSettings.eyeTextureResolutionScale.ToString("0.00"));
+            if (XrState.IsActive && XrState.IsOpenVr) Line(report, "SteamVR", SteamVrTimingReport());
+            Line(report, "DLSS", Settings.DisableDlss.Value ? "removed from the options (VR tab > Allow DLSS is off)" : "allowed, " + DlssEyes.Describe());
+
             Section(report, "VR UI");
             IUiDisplay display = runtime.Display;
             Line(report, "Display", display == null ? "none (VR inactive or still starting)" : display.Name + ": " + display.Status);
@@ -121,8 +129,6 @@ namespace VoidCrewVRUIFix
                 RenderPipelineSettings settings = asset.currentPlatformRenderPipelineSettings;
                 Line(report, "Asset", asset.name + ", colour buffer " + settings.colorBufferFormat + ", custom passes " + settings.supportCustomPass +
                                      ", dynamic resolution " + settings.dynamicResolutionSettings.enabled + ", DLSS hardware " + HDDynamicResolutionPlatformCapabilities.DLSSDetected);
-                Line(report, "DLSS", (Settings.DisableDlss.Value ? "removed from the options (VR tab > Allow DLSS is off)" : "allowed") +
-                                    ", eye fix " + DlssEyes.Describe());
             }
             else
             {
@@ -276,6 +282,18 @@ namespace VoidCrewVRUIFix
                 }
             }
             return text.ToString();
+        }
+
+        private static string SteamVrTimingReport()
+        {
+            try
+            {
+                return SteamVrTiming.Describe();
+            }
+            catch (Exception e)
+            {
+                return "unavailable (" + e.GetType().Name + ": " + e.Message + ")";
+            }
         }
 
         private static string GameStateName()

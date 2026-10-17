@@ -22,6 +22,12 @@ namespace VoidCrewVRUIFix
     {
         private const string PanelName = "VoidCrewVRUIFix_VRSettingsPanel";
 
+        /// <summary>The VR tab's limit for menu darkening; at 100% the world behind menus is simply black.</summary>
+        private const float MaxBackdropOpacity = 0.8f;
+
+        /// <summary>Slider number format with a degree sign.</summary>
+        private const string Degrees = "0\u00b0";
+
         // One list of row refreshers per Settings menu: the game can create more than one (main menu and in game).
         private static readonly Dictionary<VisualElement, List<Action>> Refreshers = new Dictionary<VisualElement, List<Action>>();
 
@@ -170,54 +176,104 @@ namespace VoidCrewVRUIFix
 
         private static void AddRows(VisualElement rows, List<Action> refreshers)
         {
-            AddToggle(rows, refreshers, "VR MODE", () => XrState.IsActive, on =>
-            {
-                if (on != XrState.IsActive && !UuvrCompat.ToggleVr())
+            AddToggle(rows, refreshers, "VR ON / OFF (THIS SESSION)",
+                "Turns VR off or back on without restarting, like UUVR's F3 key. The game always starts in VR, so this isn't remembered after a restart.",
+                () => XrState.IsActive, on =>
                 {
-                    Log.Warn("Could not switch VR " + (on ? "on" : "off") + " (UUVR not found). Use UUVR's F3 key instead.");
-                }
-            });
-            AddDropdown(rows, refreshers, "VR API (RESTART THE GAME AFTER CHANGING)", new[] { "OpenXR", "OpenVR (SteamVR)" },
+                    if (on != XrState.IsActive && !UuvrCompat.ToggleVr())
+                    {
+                        Log.Warn("Could not switch VR " + (on ? "on" : "off") + " (UUVR not found). Use UUVR's F3 key instead.");
+                    }
+                });
+            AddDropdown(rows, refreshers, "VR SYSTEM (NEEDS RESTART)",
+                "Which VR system UUVR uses. OpenVR (SteamVR) is recommended: it lets the UI be shown as a sharp SteamVR overlay. Restart the game after changing this.",
+                new[] { "OpenXR", "OpenVR (SteamVR)" },
                 () => UuvrCompat.VrApi == "OpenVr" ? 1 : 0,
                 choice => UuvrCompat.SetSetting("PreferredVrApi", choice == 1 ? "OpenVr" : "OpenXr"));
-            AddDropdown(rows, refreshers, "UI DISPLAY", new[] { "Automatic", "SteamVR overlay", "In-game panel" },
+            AddDropdown(rows, refreshers, "UI SHOWN AS",
+                "How menus and the HUD reach your headset. Automatic uses the SteamVR overlay when it can. SteamVR overlay: SteamVR draws the UI on its own floating screen, the sharpest option. " +
+                "Drawn into the game image: also works with OpenXR, but is a little softer. F7 switches this too.",
+                new[] { "Automatic (best)", "SteamVR overlay (sharpest)", "Drawn into the game image" },
                 () => (int)Settings.DisplayMode.Value, choice => Settings.DisplayMode.Value = (UiDisplayMode)choice);
-            AddSlider(rows, refreshers, "UI SIZE (DEGREES WIDE)", 30f, 120f, "F0", () => Settings.PanelWidthDegrees.Value, v => Settings.PanelWidthDegrees.Value = Mathf.Round(v));
-            AddSlider(rows, refreshers, "UI DISTANCE (METRES)", 0.5f, 5f, "F1", () => Settings.PanelDistance.Value, v => Settings.PanelDistance.Value = Mathf.Round(v * 10f) / 10f);
-            AddSlider(rows, refreshers, "UI HEIGHT (METRES)", -1f, 1f, "F2", () => Settings.PanelHeightOffset.Value, v => Settings.PanelHeightOffset.Value = Mathf.Round(v * 20f) / 20f);
-            AddToggle(rows, refreshers, "UI FOLLOWS HEAD", () => Settings.Anchor.Value == PanelAnchor.Head,
-                on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
-            AddSlider(rows, refreshers, "MENU BACKGROUND DIMMING", 0f, 1f, "F2", () => Settings.MenuBackdropOpacity.Value, v => Settings.MenuBackdropOpacity.Value = Mathf.Round(v * 20f) / 20f);
-            AddSlider(rows, refreshers, "VR CURSOR SIZE", 0.5f, 4f, "F1", () => Settings.CursorScale.Value, v => Settings.CursorScale.Value = Mathf.Round(v * 10f) / 10f);
-            AddToggle(rows, refreshers, "LEVEL HORIZON", () => UuvrCompat.GetSetting("AlignCameraToHorizon") == "True",
-                on => UuvrCompat.SetSetting("AlignCameraToHorizon", on ? "True" : "False"));
-            AddDropdown(rows, refreshers, "GAME WINDOW SHOWS", new[] { "Headset view with UI", "Headset mirror (no UI)", "UI only" },
+            AddSlider(rows, refreshers, "UI SCREEN SIZE",
+                "How wide the floating UI screen looks, as an angle of your view (default 70). Bigger is easier to read; smaller keeps the edges of menus in sight.",
+                30f, 120f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.PanelWidthDegrees.Value, v => Settings.PanelWidthDegrees.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "UI SCREEN DISTANCE",
+                "How far away the UI screen floats (default 1.5 m). It looks the same size at any distance, so this only changes how deep it sits compared with the game world.",
+                0.5f, 5f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
+                () => Settings.PanelDistance.Value, v => Settings.PanelDistance.Value = Mathf.Round(v * 10f) / 10f);
+            AddSlider(rows, refreshers, "UI SCREEN HEIGHT",
+                "Moves the UI screen up or down, in metres. 0 keeps it centred on your view.",
+                -1f, 1f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.00 m",
+                () => Settings.PanelHeightOffset.Value, v => Settings.PanelHeightOffset.Value = Mathf.Round(v * 20f) / 20f);
+            AddToggle(rows, refreshers, "UI SCREEN FOLLOWS YOUR HEAD",
+                "On: the UI screen stays in front of your eyes wherever you look. Off (default): it stays in front of the game camera, so you can look around it, and markers and pings line up with the world.",
+                () => Settings.Anchor.Value == PanelAnchor.Head, on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
+            AddSlider(rows, refreshers, "DARKEN WORLD BEHIND MENUS",
+                "While a menu or terminal is open, puts a dark layer over the game world behind it, which can make menu text easier to read (default 0%, off). " +
+                "Menus that already darken the screen, like Settings, only get slightly darker.",
+                0f, MaxBackdropOpacity, SliderFloatSettingEntryVE.NumberDisplayMode.Percentage, "F0",
+                () => Settings.MenuBackdropOpacity.Value, v => Settings.MenuBackdropOpacity.Value = Mathf.Round(v * 20f) / 20f);
+            AddSlider(rows, refreshers, "VR MOUSE POINTER SIZE",
+                "Size of the mouse pointer drawn on the UI screen in VR (default 1.0X).",
+                0.5f, 4f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
+                () => Settings.CursorScale.Value, v => Settings.CursorScale.Value = Mathf.Round(v * 10f) / 10f);
+            AddToggle(rows, refreshers, "KEEP HORIZON LEVEL (UUVR)",
+                "A UUVR setting. On: the game only turns you left and right, and you look up and down with your head, which some people find more comfortable. " +
+                "Off (default): the mouse tilts the view up and down as usual.",
+                () => UuvrCompat.GetSetting("AlignCameraToHorizon") == "True", on => UuvrCompat.SetSetting("AlignCameraToHorizon", on ? "True" : "False"));
+            AddDropdown(rows, refreshers, "MONITOR WINDOW SHOWS",
+                "What the game window on your monitor shows while you play in VR. Headset view with UI: what you see in the headset, menus included (default). " +
+                "Headset view, no UI: Unity's plain mirror of one eye. UI only: just the menus and HUD on black.",
+                new[] { "Headset view with UI", "Headset view, no UI", "UI only" },
                 () => (int)Settings.DesktopView.Value, choice => Settings.DesktopView.Value = (DesktopViewMode)choice);
-            AddSlider(rows, refreshers, "GAME WINDOW VIEW WIDTH (DEGREES)", 30f, 170f, "F0", () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
-            AddToggle(rows, refreshers, "CONTROL FROM STEAMVR VR VIEW WINDOW", () => Settings.ControlFromVrView.Value, on => Settings.ControlFromVrView.Value = on);
-            AddToggle(rows, refreshers, "ALLOW DLSS (EXPERIMENTAL, RESTART THE GAME)", () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
+            AddSlider(rows, refreshers, "MONITOR WINDOW VIEW WIDTH",
+                "How much of the headset view the monitor window shows when it shows the headset view with UI (default 90). Lower zooms in; higher shows more around the edges.",
+                30f, 170f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
+                () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
+            AddToggle(rows, refreshers, "ALLOW DLSS (EXPERIMENTAL, NEEDS RESTART)",
+                "Puts DLSS back in Graphics > Upscaling. DLSS renders the game at a lower resolution and upscales it, which can raise the frame rate on NVIDIA RTX cards. " +
+                "It's experimental in VR. Restart the game after turning this on, then choose DLSS under Graphics > Upscaling.",
+                () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
+            AddToggle(rows, refreshers, "TESTING: CONTROL FROM STEAMVR VR VIEW",
+                "Only for testing without a headset, using SteamVR's null driver. While SteamVR's VR View window is the focused window, your keyboard and mouse are passed to the game. " +
+                "Leave this off when you play with a real headset.",
+                () => Settings.ControlFromVrView.Value, on => Settings.ControlFromVrView.Value = on);
         }
 
-        private static void AddToggle(VisualElement rows, List<Action> refreshers, string label, Func<bool> read, Action<bool> write)
+        private static void AddToggle(VisualElement rows, List<Action> refreshers, string label, string help, Func<bool> read, Action<bool> write)
         {
             var row = new BooleanSettingsEntryVE();
             var value = new IntSetting(read() ? 1 : 0, 0, 1, false);
-            Prepare(row, label);
+            Prepare(row, label, help);
             row.Init(value);
+            ShowToggleState(row, value.Value == 1);
             value.OnValueChanged += v => Apply(label, v == 1 ? "on" : "off", () => write(v == 1));
             refreshers.Add(() =>
             {
                 value.SetValue(read() ? 1 : 0, true);
                 row.Reload();
+                ShowToggleState(row, value.Value == 1);
             });
             rows.Add(row);
         }
 
-        private static void AddSlider(VisualElement rows, List<Action> refreshers, string label, float min, float max, string format, Func<float> read, Action<float> write)
+        /// <summary>
+        /// The game's toggle row only restyles itself (ENABLED/DISABLED) from a change event, and a row that isn't on
+        /// screen yet gets none, so a saved "on" used to show as off, and clicking it turned the setting off.
+        /// </summary>
+        private static void ShowToggleState(VisualElement row, bool on)
+        {
+            row.EnableInClassList("settings-toggle__true", on);
+            row.EnableInClassList("settings-toggle__false", !on);
+        }
+
+        private static void AddSlider(VisualElement rows, List<Action> refreshers, string label, string help, float min, float max,
+            SliderFloatSettingEntryVE.NumberDisplayMode mode, string format, Func<float> read, Action<float> write)
         {
             var row = new SliderFloatSettingEntryVE();
-            var setter = AccessTools.Property(typeof(SliderFloatSettingEntryVE), "DisplayMode");
-            if (setter != null) setter.SetValue(row, SliderFloatSettingEntryVE.NumberDisplayMode.Value, null);
+            AccessTools.Property(typeof(SliderFloatSettingEntryVE), "DisplayMode")?.SetValue(row, mode, null);
             AccessTools.Property(typeof(SliderFloatSettingEntryVE), "ValueCulture")?.SetValue(row, format, null);
             AccessTools.Property(typeof(SliderFloatSettingEntryVE), "LowValue")?.SetValue(row, min, null);
             AccessTools.Property(typeof(SliderFloatSettingEntryVE), "HighValue")?.SetValue(row, max, null);
@@ -225,9 +281,10 @@ namespace VoidCrewVRUIFix
             row.slider.highValue = max;
 
             var value = new FloatSetting(Mathf.Clamp(read(), min, max), min, max, false);
-            Prepare(row, label);
+            Prepare(row, label, help);
             row.Init(value);
-            value.OnValueChanged += v => Apply(label, v.ToString(format), () => write(v));
+            string logFormat = mode == SliderFloatSettingEntryVE.NumberDisplayMode.Percentage ? "0%" : format;
+            value.OnValueChanged += v => Apply(label, v.ToString(logFormat), () => write(v));
             refreshers.Add(() =>
             {
                 value.SetValue(Mathf.Clamp(read(), min, max), true);
@@ -236,12 +293,12 @@ namespace VoidCrewVRUIFix
             rows.Add(row);
         }
 
-        private static void AddDropdown(VisualElement rows, List<Action> refreshers, string label, string[] choices, Func<int> read, Action<int> write)
+        private static void AddDropdown(VisualElement rows, List<Action> refreshers, string label, string help, string[] choices, Func<int> read, Action<int> write)
         {
             var row = new DropdownSettingEntryVE();
             var list = new List<string>(choices);
             var value = new StringListSetting(list, Mathf.Clamp(read(), 0, list.Count - 1), false);
-            Prepare(row, label);
+            Prepare(row, label, help);
             row.Init(value);
             value.OnValueChanged += chosen => Apply(label, chosen, () => write(list.IndexOf(chosen)));
             refreshers.Add(() =>
@@ -252,11 +309,15 @@ namespace VoidCrewVRUIFix
             rows.Add(row);
         }
 
-        private static void Prepare(SettingEntryVE row, string label)
+        private static void Prepare(SettingEntryVE row, string label, string help)
         {
             row.SettingName = "VoidCrewVRUIFix " + label;
             Label text = row.Q<Label>("SettingsLabel");
             if (text != null) text.text = label;
+
+            // The game's own "?" tooltip next to the name, which it looks up by the row's setting name.
+            SettingsTooltipsList.Tooltips[row.SettingName] = new DefaultableLocalizedString { FallBackString = help };
+            row.AddOrUpdateTooltip(row.SettingName);
         }
 
         private static void Apply(string label, string shown, Action change)
