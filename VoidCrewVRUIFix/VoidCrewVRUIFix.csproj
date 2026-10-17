@@ -150,6 +150,7 @@
     <Compile Include="VrSettingsTab.cs" />
     <Compile Include="VrViewInput.cs" />
     <Compile Include="VrPerformance.cs" />
+    <Compile Include="WheelBackdrop.cs" />
     <Compile Include="XrState.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

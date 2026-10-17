@@ -47,6 +47,7 @@ namespace VoidCrewVRUIFix
             PatchTurretAim(harmony, applied, skipped);
             Patch(harmony, "PingMenu", "Open", null, nameof(PingWheelOpened), "head aim (ping wheel opened)", applied, skipped);
             Patch(harmony, "PingMenu", "Close", nameof(PingWheelClosing), null, "head aim (ping wheel let go)", applied, skipped);
+            Patch(harmony, "UI.Ping.RadialSelectionMenuVE", "Display", null, nameof(WheelShown), "wheel backdrop", applied, skipped);
             // Always on, even when DLSS is hidden from the options: if DLSS still ends up running in VR (for example a
             // setting saved before the plugin was installed), HDRP's DLSS fails on every frame without it, and the
             // headset shows nothing.
@@ -342,6 +343,12 @@ namespace VoidCrewVRUIFix
         private static void PingWheelClosing(MonoBehaviour __instance)
         {
             PingWheel.Closing(__instance);
+        }
+
+        // A wheel (pings, emotes) was shown: the dark layer behind it is cleared once it has been laid out (see WheelBackdrop).
+        private static void WheelShown(UnityEngine.UIElements.VisualElement __instance)
+        {
+            if (XrState.IsActive) WheelBackdrop.Shown(__instance);
         }
 
         // Mouse positions are mapped onto a terminal screen that isn't attached to the camera.

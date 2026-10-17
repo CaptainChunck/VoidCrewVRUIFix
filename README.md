@@ -181,6 +181,7 @@ Edit it with any text editor while the game is closed, or change settings live w
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
 | Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (what the headset shows, with the UI panel and cursor where they appear in VR), `HeadsetMirror` (Unity's zoomed mirror, no UI) or `UiOnly` |
 | Fixes → UI On Terminal Screens | true | While you use a terminal, the mouse pointer and button hints move onto the terminal's screen |
+| Fixes → Hide Wheel Backdrop | true | Hides the dark layer the game puts over the screen while the ping wheel is held open, which made the UI screen and HUDs dark boxes in VR |
 | Fixes → Hide Turret Screen Border | true | Hides the dark border the game fades in around the screen while you control a turret, which showed as a dark box around the UI in VR |
 | Fixes → Keep Terminal Screens In World | true | Keeps a terminal's screen on the terminal while you use it. The game attaches it to the camera, which in VR makes it follow your head |
 | Fixes → Desktop View Width (degrees) | 90 | How wide a view the game window shows in `PanelView` |

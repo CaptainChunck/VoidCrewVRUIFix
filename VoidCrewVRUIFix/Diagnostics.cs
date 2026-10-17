@@ -76,7 +76,7 @@ namespace VoidCrewVRUIFix
             Line(report, "Player HUD", runtime.Hud.Describe());
             Line(report, "Turret HUD", runtime.TurretHud.Describe());
             Line(report, "Turret aim", TurretAim.Describe());
-            Line(report, "Wheels", PingWheel.Describe());
+            Line(report, "Wheels", PingWheel.Describe() + " | dark layer behind wheels " + WheelBackdrop.Describe());
             Line(report, "Aiming", (Settings.AimWithHead.Value ? "with your head" : "with the mouse") + " | aiming with the head now " + HeadAim.Aiming +
                                   ", UI screen follows the head now " + HeadAim.PanelFollowsHead +
                                   (HeadAim.InVehicleView ? ", turret or ship camera view (crosshair on the game camera's centre line)" : ""));

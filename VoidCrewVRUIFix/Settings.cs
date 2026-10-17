@@ -65,6 +65,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> KeepTerminalScreensInWorld;
         public static ConfigEntry<bool> SnapUiToTerminalScreens;
         public static ConfigEntry<bool> HideTurretScreenBorder;
+        public static ConfigEntry<bool> HideWheelBackdrop;
         public static ConfigEntry<bool> DisableDlss;
         public static ConfigEntry<bool> DisableFsr3;
         public static ConfigEntry<bool> DisableUuvrUi;
@@ -176,6 +177,9 @@ namespace VoidCrewVRUIFix
             HideTurretScreenBorder = config.Bind("Fixes", "Hide Turret Screen Border", true,
                 "Hides the dark border the game fades in along the screen edges while you control a turret (black bars when you zoom in). " +
                 "On a monitor it frames the picture; in VR it showed as a dark box around the UI.");
+            HideWheelBackdrop = config.Bind("Fixes", "Hide Wheel Backdrop", true,
+                "Hides the dark layer the game puts over the whole screen while the ping wheel (or another wheel) is held open. " +
+                "On a monitor it dims the world; in VR it made the UI screen and the head-locked HUDs dark boxes.");
             DisableDlss = config.Bind("Fixes", "Disable DLSS", true,
                 "Removes DLSS from the graphics options while UUVR is installed. Set to false to try DLSS in VR (experimental): " +
                 "restart the game, then pick DLSS under Graphics > Upscaling. DLSS then only runs on the player camera.");

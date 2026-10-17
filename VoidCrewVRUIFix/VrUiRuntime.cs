@@ -71,6 +71,7 @@ namespace VoidCrewVRUIFix
             // Changing a HUD setting shows that HUD for a few seconds, even with the Settings menu open.
             _hud.PreviewOnChange();
             _turretHud.PreviewOnChange();
+            Settings.HideWheelBackdrop.SettingChanged += (sender, args) => { if (!Settings.HideWheelBackdrop.Value) WheelBackdrop.Restore(); };
 
             // Order inside each frame: headset image into the desktop picture, capture the UI, then put the UI on
             // the desktop picture and send it to the headset display. With the monitor picture off, the desktop
@@ -177,6 +178,7 @@ namespace VoidCrewVRUIFix
             _turretHud.Update(menuOpen, _fill.Current.a > 0.003f);
             HeadAim.Update(true, menuOpen);
             PingWheel.Update();
+            WheelBackdrop.Update();
             _desktop.UiInSceneImage = _display is InGamePanelDisplay;
             _cursor.Update(Settings.ShowVrCursor.Value && cursorShown);
             IntroVideo.Update();
@@ -286,6 +288,7 @@ namespace VoidCrewVRUIFix
             _turretHud.Stop();
             HeadAim.Stop();
             PingWheel.Stop();
+            WheelBackdrop.Restore();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;
