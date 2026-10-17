@@ -13,7 +13,7 @@ namespace VoidCrewVRUIFix
     {
         public const string Guid = "com.user.voidcrew.vruifix";
         public const string Name = "Void Crew VR UI Fix";
-        public const string Version = "3.6.0";
+        public const string Version = "3.6.1";
 
         private GameObject _runtime;
 
@@ -30,6 +30,7 @@ namespace VoidCrewVRUIFix
             UuvrCompat.Resolve();
             Log.Info(Name + " " + Version + " | Unity " + Application.unityVersion + " | " + SystemInfo.graphicsDeviceType +
                      " | UUVR " + UuvrCompat.Version + (UuvrCompat.Installed ? " (VR API " + UuvrCompat.VrApi + ", camera tracking " + UuvrCompat.CameraTracking + ")" : ""));
+            Log.Info("VR settings loaded from " + Config.ConfigFilePath + ": " + Settings.Describe() + ".");
             if (!UuvrCompat.Installed)
             {
                 Log.Warn("UUVR is not installed, so the game will not run in VR and this plugin will stay idle. Install UUVR for Void Crew with Rai Pal.");

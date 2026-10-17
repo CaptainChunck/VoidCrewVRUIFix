@@ -150,11 +150,11 @@ namespace VoidCrewVRUIFix
             }
         }
 
-        private static void SettingsMenuOpened()
+        private static void SettingsMenuOpened(MonoBehaviour __instance)
         {
             try
             {
-                RefreshVrSettingsTab();
+                RefreshVrSettingsTab(__instance);
             }
             catch (Exception e)
             {
@@ -170,9 +170,9 @@ namespace VoidCrewVRUIFix
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void RefreshVrSettingsTab()
+        private static void RefreshVrSettingsTab(MonoBehaviour settingsScreen)
         {
-            VrSettingsTab.Refresh();
+            VrSettingsTab.Refresh(settingsScreen);
         }
 
         private static void HideHardwareCursorGraphic(ref bool showTexture)

@@ -154,6 +154,17 @@ namespace VoidCrewVRUIFix
             Migrate();
         }
 
+        /// <summary>One line with the settings players change most, for the start-up log.</summary>
+        public static string Describe()
+        {
+            return string.Format(
+                "UI {0:0}° wide at {1:0.0} m (anchor {2}, height {3:0.00} m), display {4}, menu dimming {5:0.00}, cursor x{6:0.0}, " +
+                "game window {7} {8:0}° wide, DLSS {9}, control from VR View {10}",
+                PanelWidthDegrees.Value, PanelDistance.Value, Anchor.Value, PanelHeightOffset.Value, DisplayMode.Value,
+                MenuBackdropOpacity.Value, CursorScale.Value, DesktopView.Value, DesktopViewWidth.Value,
+                DisableDlss.Value ? "off" : "allowed", ControlFromVrView.Value ? "on" : "off");
+        }
+
         /// <summary>Updates values saved by older plugin versions whose defaults turned out to be wrong.</summary>
         private static void Migrate()
         {

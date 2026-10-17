@@ -12,6 +12,8 @@ namespace VoidCrewVRUIFix
     internal static class Log
     {
         private const int MaxRecentProblems = 25;
+        private const float DebounceSeconds = 0.75f;
+        private static readonly Dictionary<string, KeyValuePair<string, float>> Debounced = new Dictionary<string, KeyValuePair<string, float>>();
 
         private static ManualLogSource _source;
         private static readonly HashSet<string> OnceKeys = new HashSet<string>();
@@ -55,6 +57,34 @@ namespace VoidCrewVRUIFix
         public static void InfoOnce(string key, string message)
         {
             if (OnceKeys.Add(key)) Info(message);
+        }
+
+        /// <summary>
+        /// Logs a message once it has stopped changing for a moment, e.g. a slider being dragged: only the final
+        /// value is written. <see cref="FlushDebounced"/> must be called every frame.
+        /// </summary>
+        public static void InfoDebounced(string key, string message)
+        {
+            Debounced[key] = new KeyValuePair<string, float>(message, UnityEngine.Time.unscaledTime);
+        }
+
+        public static void FlushDebounced()
+        {
+            if (Debounced.Count == 0) return;
+            float now = UnityEngine.Time.unscaledTime;
+            List<string> ready = null;
+            foreach (KeyValuePair<string, KeyValuePair<string, float>> entry in Debounced)
+            {
+                if (now - entry.Value.Value < DebounceSeconds) continue;
+                if (ready == null) ready = new List<string>();
+                ready.Add(entry.Key);
+            }
+            if (ready == null) return;
+            foreach (string key in ready)
+            {
+                Info(Debounced[key].Key);
+                Debounced.Remove(key);
+            }
         }
 
         public static void WarnOnce(string key, string message)

@@ -86,6 +86,7 @@ namespace VoidCrewVRUIFix
 
         private void Update()
         {
+            Log.FlushDebounced();
             try
             {
                 Tick();

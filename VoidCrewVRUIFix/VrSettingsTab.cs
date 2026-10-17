@@ -22,7 +22,8 @@ namespace VoidCrewVRUIFix
     {
         private const string PanelName = "VoidCrewVRUIFix_VRSettingsPanel";
 
-        private static readonly List<Action> Refreshers = new List<Action>();
+        // One list of row refreshers per Settings menu: the game can create more than one (main menu and in game).
+        private static readonly Dictionary<VisualElement, List<Action>> Refreshers = new Dictionary<VisualElement, List<Action>>();
 
         public static void Install(MonoBehaviour settingsScreen)
         {
@@ -55,7 +56,10 @@ namespace VoidCrewVRUIFix
             VisualElement panel = CreatePanel(document, generalPanel, Depth(generalPanel, generalTab), out rows);
             panel.name = PanelName;
             panel.style.display = DisplayStyle.None;
-            AddRows(rows);
+            var refreshers = new List<Action>();
+            AddRows(rows, refreshers);
+            ForgetClosedMenus();
+            Refreshers[root] = refreshers;
             tabContainer.hierarchy.Insert(index, panel);
 
             AddHeader(tabs, index);
@@ -63,10 +67,23 @@ namespace VoidCrewVRUIFix
             Log.Info("Added the VR tab to the game's Settings menu.");
         }
 
-        /// <summary>Called when the Settings menu opens, so the VR tab shows values changed elsewhere (hotkeys, F3).</summary>
-        public static void Refresh()
+        /// <summary>Called when a Settings menu opens, so its VR tab shows the current values (changed elsewhere, or by F3).</summary>
+        public static void Refresh(MonoBehaviour settingsScreen)
         {
-            foreach (Action refresh in Refreshers) refresh();
+            var document = settingsScreen.GetComponent<UIDocument>();
+            List<Action> refreshers;
+            if (document == null || document.rootVisualElement == null || !Refreshers.TryGetValue(document.rootVisualElement, out refreshers)) return;
+            foreach (Action refresh in refreshers) refresh();
+        }
+
+        private static void ForgetClosedMenus()
+        {
+            var closed = new List<VisualElement>();
+            foreach (VisualElement root in Refreshers.Keys)
+            {
+                if (root.panel == null) closed.Add(root);
+            }
+            foreach (VisualElement root in closed) Refreshers.Remove(root);
         }
 
         /// <summary>The tab container's direct child that holds this element, or null if it isn't inside the container.</summary>
@@ -151,46 +168,44 @@ namespace VoidCrewVRUIFix
             }
         }
 
-        private static void AddRows(VisualElement rows)
+        private static void AddRows(VisualElement rows, List<Action> refreshers)
         {
-            Refreshers.Clear();
-
-            AddToggle(rows, "VR MODE", () => XrState.IsActive, on =>
+            AddToggle(rows, refreshers, "VR MODE", () => XrState.IsActive, on =>
             {
                 if (on != XrState.IsActive && !UuvrCompat.ToggleVr())
                 {
                     Log.Warn("Could not switch VR " + (on ? "on" : "off") + " (UUVR not found). Use UUVR's F3 key instead.");
                 }
             });
-            AddDropdown(rows, "VR API (RESTART THE GAME AFTER CHANGING)", new[] { "OpenXR", "OpenVR (SteamVR)" },
+            AddDropdown(rows, refreshers, "VR API (RESTART THE GAME AFTER CHANGING)", new[] { "OpenXR", "OpenVR (SteamVR)" },
                 () => UuvrCompat.VrApi == "OpenVr" ? 1 : 0,
                 choice => UuvrCompat.SetSetting("PreferredVrApi", choice == 1 ? "OpenVr" : "OpenXr"));
-            AddDropdown(rows, "UI DISPLAY", new[] { "Automatic", "SteamVR overlay", "In-game panel" },
+            AddDropdown(rows, refreshers, "UI DISPLAY", new[] { "Automatic", "SteamVR overlay", "In-game panel" },
                 () => (int)Settings.DisplayMode.Value, choice => Settings.DisplayMode.Value = (UiDisplayMode)choice);
-            AddSlider(rows, "UI SIZE (DEGREES WIDE)", 30f, 120f, "F0", () => Settings.PanelWidthDegrees.Value, v => Settings.PanelWidthDegrees.Value = Mathf.Round(v));
-            AddSlider(rows, "UI DISTANCE (METRES)", 0.5f, 5f, "F1", () => Settings.PanelDistance.Value, v => Settings.PanelDistance.Value = Mathf.Round(v * 10f) / 10f);
-            AddSlider(rows, "UI HEIGHT (METRES)", -1f, 1f, "F2", () => Settings.PanelHeightOffset.Value, v => Settings.PanelHeightOffset.Value = Mathf.Round(v * 20f) / 20f);
-            AddToggle(rows, "UI FOLLOWS HEAD", () => Settings.Anchor.Value == PanelAnchor.Head,
+            AddSlider(rows, refreshers, "UI SIZE (DEGREES WIDE)", 30f, 120f, "F0", () => Settings.PanelWidthDegrees.Value, v => Settings.PanelWidthDegrees.Value = Mathf.Round(v));
+            AddSlider(rows, refreshers, "UI DISTANCE (METRES)", 0.5f, 5f, "F1", () => Settings.PanelDistance.Value, v => Settings.PanelDistance.Value = Mathf.Round(v * 10f) / 10f);
+            AddSlider(rows, refreshers, "UI HEIGHT (METRES)", -1f, 1f, "F2", () => Settings.PanelHeightOffset.Value, v => Settings.PanelHeightOffset.Value = Mathf.Round(v * 20f) / 20f);
+            AddToggle(rows, refreshers, "UI FOLLOWS HEAD", () => Settings.Anchor.Value == PanelAnchor.Head,
                 on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
-            AddSlider(rows, "MENU BACKGROUND DIMMING", 0f, 1f, "F2", () => Settings.MenuBackdropOpacity.Value, v => Settings.MenuBackdropOpacity.Value = Mathf.Round(v * 20f) / 20f);
-            AddSlider(rows, "VR CURSOR SIZE", 0.5f, 4f, "F1", () => Settings.CursorScale.Value, v => Settings.CursorScale.Value = Mathf.Round(v * 10f) / 10f);
-            AddToggle(rows, "LEVEL HORIZON", () => UuvrCompat.GetSetting("AlignCameraToHorizon") == "True",
+            AddSlider(rows, refreshers, "MENU BACKGROUND DIMMING", 0f, 1f, "F2", () => Settings.MenuBackdropOpacity.Value, v => Settings.MenuBackdropOpacity.Value = Mathf.Round(v * 20f) / 20f);
+            AddSlider(rows, refreshers, "VR CURSOR SIZE", 0.5f, 4f, "F1", () => Settings.CursorScale.Value, v => Settings.CursorScale.Value = Mathf.Round(v * 10f) / 10f);
+            AddToggle(rows, refreshers, "LEVEL HORIZON", () => UuvrCompat.GetSetting("AlignCameraToHorizon") == "True",
                 on => UuvrCompat.SetSetting("AlignCameraToHorizon", on ? "True" : "False"));
-            AddDropdown(rows, "GAME WINDOW SHOWS", new[] { "Headset view with UI", "Headset mirror (no UI)", "UI only" },
+            AddDropdown(rows, refreshers, "GAME WINDOW SHOWS", new[] { "Headset view with UI", "Headset mirror (no UI)", "UI only" },
                 () => (int)Settings.DesktopView.Value, choice => Settings.DesktopView.Value = (DesktopViewMode)choice);
-            AddSlider(rows, "GAME WINDOW VIEW WIDTH (DEGREES)", 30f, 170f, "F0", () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
-            AddToggle(rows, "CONTROL FROM STEAMVR VR VIEW WINDOW", () => Settings.ControlFromVrView.Value, on => Settings.ControlFromVrView.Value = on);
-            AddToggle(rows, "ALLOW DLSS (EXPERIMENTAL, RESTART THE GAME)", () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
+            AddSlider(rows, refreshers, "GAME WINDOW VIEW WIDTH (DEGREES)", 30f, 170f, "F0", () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
+            AddToggle(rows, refreshers, "CONTROL FROM STEAMVR VR VIEW WINDOW", () => Settings.ControlFromVrView.Value, on => Settings.ControlFromVrView.Value = on);
+            AddToggle(rows, refreshers, "ALLOW DLSS (EXPERIMENTAL, RESTART THE GAME)", () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
         }
 
-        private static void AddToggle(VisualElement rows, string label, Func<bool> read, Action<bool> write)
+        private static void AddToggle(VisualElement rows, List<Action> refreshers, string label, Func<bool> read, Action<bool> write)
         {
             var row = new BooleanSettingsEntryVE();
             var value = new IntSetting(read() ? 1 : 0, 0, 1, false);
             Prepare(row, label);
             row.Init(value);
-            value.OnValueChanged += v => Apply(label, () => write(v == 1));
-            Refreshers.Add(() =>
+            value.OnValueChanged += v => Apply(label, v == 1 ? "on" : "off", () => write(v == 1));
+            refreshers.Add(() =>
             {
                 value.SetValue(read() ? 1 : 0, true);
                 row.Reload();
@@ -198,7 +213,7 @@ namespace VoidCrewVRUIFix
             rows.Add(row);
         }
 
-        private static void AddSlider(VisualElement rows, string label, float min, float max, string format, Func<float> read, Action<float> write)
+        private static void AddSlider(VisualElement rows, List<Action> refreshers, string label, float min, float max, string format, Func<float> read, Action<float> write)
         {
             var row = new SliderFloatSettingEntryVE();
             var setter = AccessTools.Property(typeof(SliderFloatSettingEntryVE), "DisplayMode");
@@ -212,8 +227,8 @@ namespace VoidCrewVRUIFix
             var value = new FloatSetting(Mathf.Clamp(read(), min, max), min, max, false);
             Prepare(row, label);
             row.Init(value);
-            value.OnValueChanged += v => Apply(label, () => write(v));
-            Refreshers.Add(() =>
+            value.OnValueChanged += v => Apply(label, v.ToString(format), () => write(v));
+            refreshers.Add(() =>
             {
                 value.SetValue(Mathf.Clamp(read(), min, max), true);
                 row.Reload();
@@ -221,15 +236,15 @@ namespace VoidCrewVRUIFix
             rows.Add(row);
         }
 
-        private static void AddDropdown(VisualElement rows, string label, string[] choices, Func<int> read, Action<int> write)
+        private static void AddDropdown(VisualElement rows, List<Action> refreshers, string label, string[] choices, Func<int> read, Action<int> write)
         {
             var row = new DropdownSettingEntryVE();
             var list = new List<string>(choices);
             var value = new StringListSetting(list, Mathf.Clamp(read(), 0, list.Count - 1), false);
             Prepare(row, label);
             row.Init(value);
-            value.OnValueChanged += chosen => Apply(label, () => write(list.IndexOf(chosen)));
-            Refreshers.Add(() =>
+            value.OnValueChanged += chosen => Apply(label, chosen, () => write(list.IndexOf(chosen)));
+            refreshers.Add(() =>
             {
                 value.SetValue(Mathf.Clamp(read(), 0, list.Count - 1), true);
                 row.Reload();
@@ -244,12 +259,12 @@ namespace VoidCrewVRUIFix
             if (text != null) text.text = label;
         }
 
-        private static void Apply(string label, Action change)
+        private static void Apply(string label, string shown, Action change)
         {
             try
             {
                 change();
-                Log.Verbose("VR settings tab: changed '" + label + "'.");
+                Log.InfoDebounced("vr-tab:" + label, "VR tab: " + label + " set to " + shown + ".");
             }
             catch (Exception e)
             {
