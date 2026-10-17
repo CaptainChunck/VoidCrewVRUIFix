@@ -111,7 +111,8 @@ namespace VoidCrewVRUIFix
             FixIntroVideo = config.Bind("Fixes", "Fix Intro Video", true,
                 "Shows the start-up intro video on the VR UI panel. The game normally draws it on the camera near plane, which breaks in VR.");
             DisableDlss = config.Bind("Fixes", "Disable DLSS", true,
-                "Removes DLSS from the graphics options while UUVR is installed. DLSS crashes or breaks the image in VR.");
+                "Removes DLSS from the graphics options while UUVR is installed. Set to false to try DLSS in VR (experimental): " +
+                "restart the game, then pick DLSS under Graphics > Upscaling. DLSS then only runs on the player camera.");
             DisableFsr3 = config.Bind("Fixes", "Disable FSR3", true,
                 "Removes FSR3 from the graphics options while UUVR is installed. FSR3 is not built for VR rendering.");
             DisableUuvrUi = config.Bind("Fixes", "Disable UUVR UI", true,

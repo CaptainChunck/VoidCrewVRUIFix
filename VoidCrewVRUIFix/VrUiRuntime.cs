@@ -241,7 +241,7 @@ namespace VoidCrewVRUIFix
             }
 
             _canvases.Scan();
-            HdrpTweaks.DisableDlssOnCameras();
+            HdrpTweaks.DisableDlssOnCameras(_mainCamera);
         }
 
         private void StartDisplay()

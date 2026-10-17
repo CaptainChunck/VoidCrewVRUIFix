@@ -112,7 +112,13 @@ namespace VoidCrewVRUIFix
 
         private static bool HideDlss(ref bool __result)
         {
-            if (!Settings.DisableDlss.Value || !UuvrCompat.Installed) return true;
+            if (!UuvrCompat.Installed) return true;
+            if (!Settings.DisableDlss.Value)
+            {
+                Log.InfoOnce("dlss-allowed", "DLSS is allowed in VR (experimental). If the game crashes or the image breaks with DLSS on, " +
+                                             "switch Graphics > Upscaling back to None, or turn off 'Allow DLSS' in the VR tab.");
+                return true;
+            }
             __result = false;
             Log.InfoOnce("dlss", "DLSS removed from the graphics options because it breaks VR rendering. A saved DLSS setting falls back to 'None'.");
             return false;

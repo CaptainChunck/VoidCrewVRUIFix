@@ -180,6 +180,7 @@ namespace VoidCrewVRUIFix
                 () => (int)Settings.DesktopView.Value, choice => Settings.DesktopView.Value = (DesktopViewMode)choice);
             AddSlider(rows, "GAME WINDOW VIEW WIDTH (DEGREES)", 30f, 170f, "F0", () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
             AddToggle(rows, "CONTROL FROM STEAMVR VR VIEW WINDOW", () => Settings.ControlFromVrView.Value, on => Settings.ControlFromVrView.Value = on);
+            AddToggle(rows, "ALLOW DLSS (EXPERIMENTAL, RESTART THE GAME)", () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
         }
 
         private static void AddToggle(VisualElement rows, string label, Func<bool> read, Action<bool> write)

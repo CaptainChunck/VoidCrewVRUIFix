@@ -134,6 +134,7 @@ The easiest way to change the VR settings is in the game itself: open **Settings
 - Level horizon (UUVR's horizon lock)
 - What the game window on your monitor shows, and how wide a view it shows
 - Control from SteamVR's VR View window (for testing without a headset)
+- Allow DLSS (experimental): restart the game, then choose DLSS under Graphics > Upscaling
 
 <!-- SCREENSHOT: docs/images/vr-settings-tab.png (the VR tab in the game's Settings menu)
 ![The VR tab in the game's Settings menu](docs/images/vr-settings-tab.png)
@@ -173,7 +174,7 @@ Every setting has a description in the file.
 
 - Keyboard and mouse only. Motion controllers aren't supported yet.
 - Multiplayer hasn't been tested much yet.
-- Don't enable DLSS or FSR3 from other tools. The plugin hides them in the game's options because they break VR rendering.
+- FSR3 is hidden in VR: the game's FSR3 has no VR support and would blur the two eyes into each other. DLSS can be tried with the experimental **Allow DLSS** toggle in the VR tab.
 
 ## Uninstalling
 
