@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
@@ -33,6 +34,9 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "CG.Input.MouseCursor", "UpdateCursorGraphic", nameof(HideHardwareCursorGraphic), null, "Windows cursor", applied, skipped);
             Patch(harmony, "UI.Settings.SettingsUIPanel", "OnInitialize", null, nameof(SettingsMenuCreated), "VR settings tab", applied, skipped);
             Patch(harmony, "UI.Settings.SettingsUIPanel", "OnEnter", null, nameof(SettingsMenuOpened), "VR settings tab refresh", applied, skipped);
+            Patch(harmony, "Gameplay.Terminals.TerminalScreen", "DelayedParentWorldUiPanel", nameof(TerminalScreenEntered), null, "terminal screens", applied, skipped);
+            Patch(harmony, "CG.Client.Ship.Modules.Mediators.TerminalModuleMediator", "DelayedParentWorldUiPanel", nameof(ShipTerminalEntered), null,
+                "ship terminal screens", applied, skipped);
             // DLSS can only be picked when it is allowed, and changing that needs a restart.
             if (!Settings.DisableDlss.Value) PatchDlssEyes(harmony, applied, skipped);
             if (UuvrCompat.Installed) PatchUuvrStartup(harmony, applied, skipped);
@@ -239,6 +243,21 @@ namespace VoidCrewVRUIFix
             int passId = _dlssPassIdToRestore;
             _dlssPassIdToRestore = -1;
             DlssEyes.Restore(camera, passId);
+        }
+
+        // In VR, terminal screens stay on their terminals instead of being attached to the head-turned camera.
+        private static bool TerminalScreenEntered(MonoBehaviour __instance, ref IEnumerator __result)
+        {
+            if (!TerminalScreens.Applies) return true;
+            __result = TerminalScreens.EnterTerminalScreen(__instance);
+            return false;
+        }
+
+        private static bool ShipTerminalEntered(MonoBehaviour __instance, ref IEnumerator __result)
+        {
+            if (!TerminalScreens.Applies) return true;
+            __result = TerminalScreens.EnterShipTerminal(__instance);
+            return false;
         }
 
         private static void RedirectIntroVideo(MonoBehaviour __instance)

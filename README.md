@@ -21,6 +21,7 @@ UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip:
 | Pings, objective markers and "press E" prompts don't line up with objects | They're placed on the panel so they sit over the objects they belong to |
 | Turning on DLSS breaks VR | DLSS and FSR3 are removed from the graphics options while UUVR is installed |
 | The intro video doesn't show | The intro video plays on the panel |
+| Terminal screens follow your head and slide through the terminal and walls | Terminal screens stay on their terminals, like real screens |
 | Full-screen screens (death screen, spawn screen, fades to black) only cover part of your view | They fill your whole view, with their text on the panel |
 | Low frame rate | UUVR's hidden helper cameras, which the game renders as full extra VR views, are turned off |
 
@@ -168,6 +169,7 @@ Edit it with any text editor while the game is closed, or change settings live w
 | Cursor → Cursor Scale | 1 | Size of the VR cursor |
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
 | Fixes → Desktop View | PanelView | What the game window shows: `PanelView` (what the headset shows, with the UI panel and cursor where they appear in VR), `HeadsetMirror` (Unity's zoomed mirror, no UI) or `UiOnly` |
+| Fixes → Keep Terminal Screens In World | true | Keeps a terminal's screen on the terminal while you use it. The game attaches it to the camera, which in VR makes it follow your head |
 | Fixes → Desktop View Width (degrees) | 90 | How wide a view the game window shows in `PanelView` |
 | Fixes → Desktop View Height (degrees) | 0 | Aims the game window's view up or down in `PanelView`. At 0 it is centred on the UI panel |
 | Fixes → Desktop View On | true | Shows the game on your monitor while in VR. `false` leaves the window black |

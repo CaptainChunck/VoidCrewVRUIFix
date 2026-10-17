@@ -47,6 +47,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<bool> AlignMarkersToPanel;
         public static ConfigEntry<bool> MoveCameraCanvasesToPanel;
         public static ConfigEntry<bool> FixIntroVideo;
+        public static ConfigEntry<bool> KeepTerminalScreensInWorld;
         public static ConfigEntry<bool> DisableDlss;
         public static ConfigEntry<bool> DisableFsr3;
         public static ConfigEntry<bool> DisableUuvrUi;
@@ -119,6 +120,9 @@ namespace VoidCrewVRUIFix
                 "Moves HUD canvases that the game renders in front of the camera onto the VR UI panel, instead of a flat sheet stuck to your face.");
             FixIntroVideo = config.Bind("Fixes", "Fix Intro Video", true,
                 "Shows the start-up intro video on the VR UI panel. The game normally draws it on the camera near plane, which breaks in VR.");
+            KeepTerminalScreensInWorld = config.Bind("Fixes", "Keep Terminal Screens In World", true,
+                "Keeps a terminal's screen on the terminal while you use it. The game attaches it to the camera, which in VR makes it follow your head " +
+                "and slide through the terminal and walls.");
             DisableDlss = config.Bind("Fixes", "Disable DLSS", true,
                 "Removes DLSS from the graphics options while UUVR is installed. Set to false to try DLSS in VR (experimental): " +
                 "restart the game, then pick DLSS under Graphics > Upscaling. DLSS then only runs on the player camera.");

@@ -60,14 +60,17 @@ namespace VoidCrewVRUIFix
             int frameLimit = Application.targetFrameRate;
             if (vSync == 0 && frameLimit <= 0) return;
 
-            // First time, or the game applied its display settings again (for example from its Graphics menu).
+            // First time, or the game applied its display settings again (it does whenever they are applied, for
+            // example when its Settings menu closes). Only the first time is worth a log line.
+            bool again = _syncOverridden;
             _gameVSync = vSync;
             _gameFrameLimit = frameLimit;
             _syncOverridden = true;
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = -1;
-            Log.Info("Turned off the monitor's V-Sync (was " + vSync + ") and frame limit (was " + (frameLimit > 0 ? frameLimit.ToString() : "none") +
-                     ") while in VR, so they can't hold back the headset. SteamVR paces the frames.");
+            string message = "monitor's V-Sync (was " + vSync + ") and frame limit (was " + (frameLimit > 0 ? frameLimit.ToString() : "none") + ")";
+            if (again) Log.Verbose("The game applied its display settings again; turned off the " + message + " again.");
+            else Log.Info("Turned off the " + message + " while in VR, so they can't hold back the headset. SteamVR paces the frames.");
         }
 
         private static void UpdateHdrpXr()

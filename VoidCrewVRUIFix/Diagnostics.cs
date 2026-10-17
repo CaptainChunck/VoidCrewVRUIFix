@@ -91,6 +91,8 @@ namespace VoidCrewVRUIFix
             Line(report, "Input devices", string.Join(", ", devices.ToArray()));
             Line(report, "Canvases moved to panel", runtime.Canvases.MovedCount.ToString());
             Line(report, "Intro video", IntroVideo.Describe());
+            Line(report, "Terminal screens", (Settings.KeepTerminalScreensInWorld.Value ? "kept on their terminals in VR" : "attached to the camera (game default)") +
+                                            ", kept " + TerminalScreens.KeptInWorld + " time(s) this session");
             Line(report, "Marker alignment", MarkerAlignment.Active ? "on (camera '" + (MarkerAlignment.PlayerCamera != null ? MarkerAlignment.PlayerCamera.name : "none") + "')" : "off");
             SupportedRenderingFeatures features = SupportedRenderingFeatures.active;
             Line(report, "UI overlay owner", features != null && features.rendersUIOverlay ? "render pipeline" : "Unity (normal for VR)");
