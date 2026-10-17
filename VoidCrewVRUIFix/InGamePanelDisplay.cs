@@ -67,6 +67,7 @@ namespace VoidCrewVRUIFix
                 Quaternion.identity,
                 new Vector3(PanelLayout.WidthMeters, PanelLayout.HeightMeters, 1f));
             _pass.GameCameraToWorld = Matrix4x4.TRS(state.CameraPosition, state.CameraRotation, Vector3.one);
+            _pass.Fill = state.Fill;
         }
 
         public void AppendSubmit(CommandBuffer commands)
@@ -110,17 +111,24 @@ namespace VoidCrewVRUIFix
         public bool HeadLocked;
         public Matrix4x4 PanelInCamera = Matrix4x4.identity;
         public Matrix4x4 GameCameraToWorld = Matrix4x4.identity;
+        public Color Fill;
+
+        private const float FillExtraDistance = 0.25f;
+        private const float FillHalfAngle = 80f;
 
         private static Func<HDCamera, XRPass> _getXrPass;
         private static bool _xrLookupDone;
 
         private Material _material;
+        private Material _fillMaterial;
         private Mesh _quad;
         private Mesh _flippedQuad;
 
         protected override void Setup(ScriptableRenderContext renderContext, CommandBuffer cmd)
         {
             _material = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Panel");
+            _fillMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Panel Fill");
+            _fillMaterial.mainTexture = Texture2D.whiteTexture;
             _quad = RenderUtil.CreateQuad(false);
             _flippedQuad = RenderUtil.CreateQuad(true);
         }
@@ -136,12 +144,19 @@ namespace VoidCrewVRUIFix
                 ctx.cmd.SetViewProjectionMatrices(view, projection);
             }
 
-            Matrix4x4 anchor = GameCameraToWorld;
-            if (HeadLocked)
+            // While the frame renders, UUVR has applied the head rotation to the camera.
+            Transform cameraTransform = ctx.hdCamera.camera.transform;
+            Matrix4x4 head = Matrix4x4.TRS(cameraTransform.position, cameraTransform.rotation, Vector3.one);
+            Matrix4x4 anchor = HeadLocked ? head : GameCameraToWorld;
+
+            if (Fill.a > 0.003f)
             {
-                // While the frame renders, UUVR has applied the head rotation to the camera.
-                Transform cameraTransform = ctx.hdCamera.camera.transform;
-                anchor = Matrix4x4.TRS(cameraTransform.position, cameraTransform.rotation, Vector3.one);
+                // Full-screen UI (death screen, fades): fill the whole view behind the panel, locked to the head.
+                float distance = PanelInCamera.m23 + FillExtraDistance;
+                float size = 2f * distance * Mathf.Tan(FillHalfAngle * Mathf.Deg2Rad);
+                _fillMaterial.color = Fill;
+                ctx.cmd.DrawMesh(_quad, head * Matrix4x4.TRS(new Vector3(0f, 0f, distance), Quaternion.identity, new Vector3(size, size, 1f)),
+                    _fillMaterial, 0, 0);
             }
 
             _material.mainTexture = Texture;
@@ -152,6 +167,7 @@ namespace VoidCrewVRUIFix
         protected override void Cleanup()
         {
             CoreUtils.Destroy(_material);
+            CoreUtils.Destroy(_fillMaterial);
             CoreUtils.Destroy(_quad);
             CoreUtils.Destroy(_flippedQuad);
         }

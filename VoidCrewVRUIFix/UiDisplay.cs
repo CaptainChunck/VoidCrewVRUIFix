@@ -11,6 +11,9 @@ namespace VoidCrewVRUIFix
         public Camera Camera;
         public Vector3 CameraPosition;
         public Quaternion CameraRotation;
+
+        /// <summary>Colour to fill the rest of the view with while a full-screen UI layer shows; alpha 0 = none.</summary>
+        public Color Fill;
     }
 
     /// <summary>A way of showing the captured UI texture in the headset.</summary>

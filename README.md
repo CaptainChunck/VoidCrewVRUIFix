@@ -21,6 +21,7 @@ UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip:
 | Pings, objective markers and "press E" prompts don't line up with objects | They're placed on the panel so they sit over the objects they belong to |
 | Turning on DLSS breaks VR | DLSS and FSR3 are removed from the graphics options while UUVR is installed |
 | The intro video doesn't show | The intro video plays on the panel |
+| Full-screen screens (death screen, spawn screen, fades to black) only cover part of your view | They fill your whole view, with their text on the panel |
 | Low frame rate | UUVR's hidden helper cameras, which the game renders as full extra VR views, are turned off |
 
 <!-- SCREENSHOT: docs/images/before-after.png (UUVR alone vs. with the plugin)

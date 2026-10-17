@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Valve.VR;
 
@@ -16,6 +17,11 @@ namespace VoidCrewVRUIFix
     internal sealed class SteamVrOverlayDisplay : IUiDisplay
     {
         private const string OverlayKey = "voidcrew.vruifix.ui";
+        private const string FillKey = "voidcrew.vruifix.fill";
+
+        // The fill sits just behind the UI panel, locked to the head, and is wide enough to cover the whole view.
+        private const float FillExtraDistance = 0.25f;
+        private const float FillHalfAngle = 80f;
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate void RenderEventCallback(int eventId, IntPtr data);
@@ -25,6 +31,9 @@ namespace VoidCrewVRUIFix
         private static CVROverlay _submitOverlay;
         private static ulong _submitHandle;
         private static Texture_t _submitTexture;
+        private static ulong _submitFillHandle;
+        private static Texture_t _submitFillTexture;
+        private static bool _submitFillActive;
         private static uint _submitInitToken;
         private static volatile int _submitError;
         private static volatile string _submitException;
@@ -37,8 +46,15 @@ namespace VoidCrewVRUIFix
 
         private readonly CVROverlay _overlay;
         private readonly ulong _handle;
+        private readonly ulong _fillHandle;
+        private readonly RenderTexture _fillTexture;
         private readonly uint _initToken;
         private bool _shown;
+        private bool _fillShown;
+        private Color _fillColour;
+        private float _appliedFillAlpha = -1f;
+        private float _appliedFillDistance = -1f;
+        private float _appliedFillHeight = float.NaN;
         private bool _needsRecenter = true;
         private Vector3 _center;
         private ETrackingUniverseOrigin _origin = ETrackingUniverseOrigin.TrackingUniverseStanding;
@@ -51,15 +67,36 @@ namespace VoidCrewVRUIFix
         private int _reportedError;
         private string _reportedException;
 
-        private SteamVrOverlayDisplay(CVROverlay overlay, ulong handle)
+        private SteamVrOverlayDisplay(CVROverlay overlay, ulong handle, ulong fillHandle)
         {
             _overlay = overlay;
             _handle = handle;
+            _fillHandle = fillHandle;
             _initToken = OpenVR.GetInitToken();
 
             Check(_overlay.SetOverlayFlag(handle, VROverlayFlags.IsPremultiplied, true), "SetOverlayFlag(IsPremultiplied)");
-            Check(_overlay.SetOverlaySortOrder(handle, 0), "SetOverlaySortOrder");
+            Check(_overlay.SetOverlaySortOrder(handle, 1), "SetOverlaySortOrder");
             _overlay.HideOverlay(handle);
+
+            if (fillHandle != 0)
+            {
+                // A tiny texture cleared to the fill colour; its opacity is set on the overlay itself.
+                _fillTexture = new RenderTexture(4, 4, 0, GraphicsFormat.R8G8B8A8_SRGB)
+                {
+                    name = "VoidCrewVRUIFix_Fill",
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                _fillTexture.Create();
+                Check(_overlay.SetOverlaySortOrder(fillHandle, 0), "SetOverlaySortOrder(fill)");
+                _overlay.HideOverlay(fillHandle);
+                IntPtr nativeFill = _fillTexture.GetNativeTexturePtr();
+                lock (SubmitLock)
+                {
+                    _submitFillHandle = fillHandle;
+                    _submitFillTexture = new Texture_t { handle = nativeFill, eType = ETextureType.DirectX, eColorSpace = EColorSpace.Auto };
+                    _submitFillActive = false;
+                }
+            }
         }
 
         public string Name { get { return "SteamVR overlay"; } }
@@ -121,8 +158,16 @@ namespace VoidCrewVRUIFix
                 }
             }
 
+            // Optional second overlay that fills the view behind full-screen UI (death screen, fades).
+            ulong fillHandle = 0;
+            if (overlay.FindOverlay(FillKey, ref fillHandle) != EVROverlayError.None || fillHandle == 0)
+            {
+                fillHandle = 0;
+                if (overlay.CreateOverlay(FillKey, "Void Crew UI background", ref fillHandle) != EVROverlayError.None) fillHandle = 0;
+            }
+
             reason = null;
-            return new SteamVrOverlayDisplay(overlay, handle);
+            return new SteamVrOverlayDisplay(overlay, handle, fillHandle);
         }
 
         public void SetTexture(RenderTexture texture)
@@ -173,11 +218,54 @@ namespace VoidCrewVRUIFix
                 _shown = show;
             }
 
+            UpdateFill(show ? state.Fill : Color.clear);
             ReportRenderThreadProblems();
+        }
+
+        private void UpdateFill(Color fill)
+        {
+            if (_fillHandle == 0) return;
+
+            bool show = fill.a > 0.003f;
+            if (show)
+            {
+                float distance = PanelLayout.Distance + FillExtraDistance;
+                float height = PanelLayout.HeightOffset;
+                if (distance != _appliedFillDistance || height != _appliedFillHeight)
+                {
+                    var transform = new HmdMatrix34_t { m0 = 1f, m5 = 1f, m10 = 1f, m7 = height, m11 = -distance };
+                    Check(_overlay.SetOverlayTransformTrackedDeviceRelative(_fillHandle, OpenVR.k_unTrackedDeviceIndex_Hmd, ref transform),
+                        "SetOverlayTransformTrackedDeviceRelative(fill)");
+                    Check(_overlay.SetOverlayWidthInMeters(_fillHandle, 2f * distance * Mathf.Tan(FillHalfAngle * Mathf.Deg2Rad)),
+                        "SetOverlayWidthInMeters(fill)");
+                    _appliedFillDistance = distance;
+                    _appliedFillHeight = height;
+                }
+                if (Mathf.Abs(fill.a - _appliedFillAlpha) > 0.002f)
+                {
+                    Check(_overlay.SetOverlayAlpha(_fillHandle, fill.a), "SetOverlayAlpha(fill)");
+                    _appliedFillAlpha = fill.a;
+                }
+                _fillColour = fill;
+            }
+
+            if (show != _fillShown)
+            {
+                Check(show ? _overlay.ShowOverlay(_fillHandle) : _overlay.HideOverlay(_fillHandle), show ? "ShowOverlay(fill)" : "HideOverlay(fill)");
+                _fillShown = show;
+                lock (SubmitLock) _submitFillActive = show;
+            }
         }
 
         public void AppendSubmit(CommandBuffer commands)
         {
+            if (_fillShown && _fillTexture != null)
+            {
+                // Clear colours are linear; the fill colour was measured from the gamma-encoded UI image.
+                Color linear = _fillColour.linear;
+                commands.SetRenderTarget(_fillTexture);
+                commands.ClearRenderTarget(false, true, new Color(linear.r, linear.g, linear.b, 1f));
+            }
             if (Settings.SubmitOverlayOnRenderThread.Value && _shown)
             {
                 commands.IssuePluginEventAndData(SubmitCallbackPtr, 0, IntPtr.Zero);
@@ -190,6 +278,11 @@ namespace VoidCrewVRUIFix
             Texture_t texture = _submitTexture;
             EVROverlayError error = _overlay.SetOverlayTexture(_handle, ref texture);
             if (error != EVROverlayError.None) _submitError = (int)error;
+            if (_fillShown)
+            {
+                Texture_t fill = _submitFillTexture;
+                _overlay.SetOverlayTexture(_fillHandle, ref fill);
+            }
             Interlocked.Increment(ref _submitCount);
         }
 
@@ -205,12 +298,27 @@ namespace VoidCrewVRUIFix
                 _submitHandle = 0;
                 _submitOverlay = null;
                 _submitTexture = default(Texture_t);
+                _submitFillHandle = 0;
+                _submitFillTexture = default(Texture_t);
+                _submitFillActive = false;
             }
 
-            // If VR was already turned off, OpenVR is gone and the overlay with it. Calling into it would crash.
-            if (!IsAlive) return;
-            _overlay.HideOverlay(_handle);
-            _overlay.DestroyOverlay(_handle);
+            // If VR was already turned off, OpenVR is gone and the overlays with it. Calling into it would crash.
+            if (IsAlive)
+            {
+                _overlay.HideOverlay(_handle);
+                _overlay.DestroyOverlay(_handle);
+                if (_fillHandle != 0)
+                {
+                    _overlay.HideOverlay(_fillHandle);
+                    _overlay.DestroyOverlay(_fillHandle);
+                }
+            }
+            if (_fillTexture != null)
+            {
+                _fillTexture.Release();
+                UnityEngine.Object.Destroy(_fillTexture);
+            }
         }
 
         private void ApplyPlacement()
@@ -315,12 +423,18 @@ namespace VoidCrewVRUIFix
                 CVROverlay overlay;
                 ulong handle;
                 Texture_t texture;
+                ulong fillHandle;
+                Texture_t fillTexture;
+                bool fillActive;
                 uint initToken;
                 lock (SubmitLock)
                 {
                     overlay = _submitOverlay;
                     handle = _submitHandle;
                     texture = _submitTexture;
+                    fillHandle = _submitFillHandle;
+                    fillTexture = _submitFillTexture;
+                    fillActive = _submitFillActive;
                     initToken = _submitInitToken;
                 }
                 if (overlay == null || handle == 0 || texture.handle == IntPtr.Zero) return;
@@ -330,6 +444,10 @@ namespace VoidCrewVRUIFix
 
                 EVROverlayError error = overlay.SetOverlayTexture(handle, ref texture);
                 if (error != EVROverlayError.None) _submitError = (int)error;
+                if (fillActive && fillHandle != 0 && fillTexture.handle != IntPtr.Zero)
+                {
+                    overlay.SetOverlayTexture(fillHandle, ref fillTexture);
+                }
                 Interlocked.Increment(ref _submitCount);
             }
             catch (Exception e)

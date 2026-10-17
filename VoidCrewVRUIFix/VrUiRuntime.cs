@@ -19,6 +19,7 @@ namespace VoidCrewVRUIFix
 
         private readonly UiCapture _capture = new UiCapture();
         private readonly DesktopView _desktop = new DesktopView();
+        private readonly FullscreenFill _fill = new FullscreenFill();
         private readonly CanvasMover _canvases = new CanvasMover();
         private readonly VrViewInput _vrViewInput = new VrViewInput();
         private CursorOverlay _cursor;
@@ -55,6 +56,8 @@ namespace VoidCrewVRUIFix
             };
             _capture.AfterCapture = (commands, ui) =>
             {
+                _fill.Sample(commands, ui);
+                _desktop.Fill = _fill.Current;
                 if (Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror) _desktop.Composite(commands, ui);
                 if (_display != null) _display.AppendSubmit(commands);
             };
@@ -78,6 +81,7 @@ namespace VoidCrewVRUIFix
         {
             _capture.Release();
             _desktop.Release();
+            _fill.Release();
         }
 
         private void Update()
@@ -167,7 +171,8 @@ namespace VoidCrewVRUIFix
                         Visible = _capture.Texture != null,
                         Camera = _mainCamera,
                         CameraPosition = _cameraPosition,
-                        CameraRotation = _cameraRotation
+                        CameraRotation = _cameraRotation,
+                        Fill = _fill.Current
                     });
                 }
             }

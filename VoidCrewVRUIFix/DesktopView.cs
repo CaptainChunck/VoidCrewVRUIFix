@@ -21,9 +21,14 @@ namespace VoidCrewVRUIFix
         private Rect _uiRect = new Rect(0f, 0f, 1f, 1f);
         private bool _sceneReady;
 
+        private Material _fillMaterial;
+
         public int LastDrawnFrame { get; private set; } = -1;
         public string Problem { get; private set; }
         public float ViewWidthDegrees { get; private set; }
+
+        /// <summary>Colour to fill the whole picture with behind the UI while a full-screen UI layer shows.</summary>
+        public Color Fill;
 
         public string Describe()
         {
@@ -59,11 +64,22 @@ namespace VoidCrewVRUIFix
             if (_uiMaterial == null) _uiMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Desktop UI");
             if (_quad == null) _quad = RenderUtil.CreateQuad(false);
 
+            commands.SetRenderTarget(_frame);
+            commands.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.Ortho(0f, 1f, 0f, 1f, -1f, 1f));
+            if (Fill.a > 0.003f)
+            {
+                if (_fillMaterial == null)
+                {
+                    _fillMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Desktop Fill");
+                    _fillMaterial.mainTexture = Texture2D.whiteTexture;
+                }
+                _fillMaterial.color = Fill;
+                commands.DrawMesh(_quad, Matrix4x4.TRS(new Vector3(0.5f, 0.5f, 0f), Quaternion.identity, Vector3.one), _fillMaterial, 0, 0);
+            }
+
             if (ui != null)
             {
                 _uiMaterial.mainTexture = ui;
-                commands.SetRenderTarget(_frame);
-                commands.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.Ortho(0f, 1f, 0f, 1f, -1f, 1f));
                 commands.DrawMesh(_quad,
                     Matrix4x4.TRS(new Vector3(_uiRect.center.x, _uiRect.center.y, 0f), Quaternion.identity, new Vector3(_uiRect.width, _uiRect.height, 1f)),
                     _uiMaterial, 0, 0);
@@ -82,8 +98,10 @@ namespace VoidCrewVRUIFix
                 _frame = null;
             }
             if (_uiMaterial != null) Object.Destroy(_uiMaterial);
+            if (_fillMaterial != null) Object.Destroy(_fillMaterial);
             if (_quad != null) Object.Destroy(_quad);
             _uiMaterial = null;
+            _fillMaterial = null;
             _quad = null;
         }
 
