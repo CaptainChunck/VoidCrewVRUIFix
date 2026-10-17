@@ -73,6 +73,15 @@ namespace VoidCrewVRUIFix
         private float _appliedFillDistance = -1f;
         private bool _needsRecenter = true;
         private Vector3 _center;
+
+        // Which way the game's forward points in SteamVR's tracking space (OpenVR convention, rotation only), measured
+        // when the panel is centred. Identity when SteamVR's tracking space and UUVR's head tracking agree.
+        private Matrix4x4 _frame = Matrix4x4.identity;
+        private bool _frameMeasured;
+        private float _frameYaw;
+        private float _frameTilt;
+        private Camera _camera;
+        private Matrix4x4 _appliedRotation = Matrix4x4.identity;
         private ETrackingUniverseOrigin _origin = ETrackingUniverseOrigin.TrackingUniverseStanding;
         private float _centerDistance;
         private float _centerOffset;
@@ -143,12 +152,14 @@ namespace VoidCrewVRUIFix
             get
             {
                 return string.Format(
-                    "handle 0x{0:X}, shown {1}, tracking space {2}, centre {3}, frames submitted {4} ({5}), last SteamVR error {6}, background fill {7}{8}",
+                    "handle 0x{0:X}, shown {1}, tracking space {2}, centre {3}{9}, frames submitted {4} ({5}), last SteamVR error {6}, background fill {7}{8}",
                     _handle, _shown, _origin, _center, Interlocked.Read(ref _submitCount),
                     Settings.SubmitOverlayOnRenderThread.Value ? "render thread" : "main thread",
                     (EVROverlayError)_submitError,
                     _fillShown ? "shown " + _appliedFillDistance.ToString("0.0") + " m away" : "hidden",
-                    _submitException != null ? ", last exception " + _submitException : "");
+                    _submitException != null ? ", last exception " + _submitException : "",
+                    _frameMeasured ? string.Format(", game forward {0:0}° to the {1} and {2:0}° tilted from the space's forward", Mathf.Abs(_frameYaw),
+                        _frameYaw < 0f ? "left" : "right", _frameTilt) : ", game forward not measured yet");
             }
         }
 
@@ -249,6 +260,7 @@ namespace VoidCrewVRUIFix
         public void Update(PanelState state)
         {
             if (!IsAlive) return;
+            _camera = state.Camera;
 
             int flip = Settings.FlipVertically.Value ? 1 : 0;
             if (flip != _appliedFlip)
@@ -452,6 +464,7 @@ namespace VoidCrewVRUIFix
         {
             PanelAnchor anchor = HeadAim.PanelFollowsHead ? PanelAnchor.Head : PanelAnchor.GameCamera;
             Vector3 position;
+            Matrix4x4 rotation = Matrix4x4.identity;
             if (anchor == PanelAnchor.Head)
             {
                 position = new Vector3(0f, PanelLayout.HeightOffset, -PanelLayout.Distance);
@@ -461,12 +474,19 @@ namespace VoidCrewVRUIFix
                 if (_centerDistance != PanelLayout.Distance || _centerOffset != PanelLayout.HeightOffset) _needsRecenter = true;
                 if (_needsRecenter) RecenterNow();
                 position = _center;
+                rotation = _frame;
             }
 
-            if (anchor == _appliedAnchor && position == _appliedPosition) return;
+            if (anchor == _appliedAnchor && position == _appliedPosition && rotation == _appliedRotation) return;
 
-            // Identity rotation: OpenVR looks down -Z and an overlay faces +Z, so the panel faces the player.
-            var transform = new HmdMatrix34_t { m0 = 1f, m5 = 1f, m10 = 1f, m3 = position.x, m7 = position.y, m11 = position.z };
+            // OpenVR looks down -Z and an overlay faces +Z, so with the frame's rotation the panel faces the player
+            // looking along the game's forward.
+            var transform = new HmdMatrix34_t
+            {
+                m0 = rotation.m00, m1 = rotation.m01, m2 = rotation.m02, m3 = position.x,
+                m4 = rotation.m10, m5 = rotation.m11, m6 = rotation.m12, m7 = position.y,
+                m8 = rotation.m20, m9 = rotation.m21, m10 = rotation.m22, m11 = position.z
+            };
             if (anchor == PanelAnchor.Head)
             {
                 Check(_overlay.SetOverlayTransformTrackedDeviceRelative(_handle, OpenVR.k_unTrackedDeviceIndex_Hmd, ref transform),
@@ -478,12 +498,15 @@ namespace VoidCrewVRUIFix
             }
             _appliedAnchor = anchor;
             _appliedPosition = position;
+            _appliedRotation = rotation;
         }
 
         /// <summary>
-        /// Places the panel straight ahead along the tracking space's forward axis, at the headset's current position.
-        /// With UUVR's RelativeTransform tracking, tracking-space forward is the in-game view direction, which keeps
-        /// the panel (and the markers on it) lined up with the world when you turn your head.
+        /// Places the panel straight ahead along the game's forward, at the headset's current position, so the panel
+        /// (and the markers on it) lines up with the world when you turn your head. With UUVR's RelativeTransform
+        /// tracking the game's forward is normally the tracking space's own forward axis, but not when SteamVR's saved
+        /// forward (its seated or standing zero) differs from the one UUVR's head tracking uses: then the panel showed
+        /// far off to one side. So the game's forward is measured in SteamVR's space each time the panel is centred.
         /// </summary>
         private void RecenterNow()
         {
@@ -491,22 +514,82 @@ namespace VoidCrewVRUIFix
             _origin = compositor != null ? compositor.GetTrackingSpace() : ETrackingUniverseOrigin.TrackingUniverseStanding;
 
             Vector3 head;
-            bool valid = TryGetHeadPosition(_origin, out head);
+            Matrix4x4 headRotation;
+            bool valid = TryGetHeadPose(_origin, out head, out headRotation);
             if (!valid)
             {
                 head = new Vector3(0f, _origin == ETrackingUniverseOrigin.TrackingUniverseStanding ? 1.6f : 0f, 0f);
             }
 
+            Matrix4x4 frame;
+            if (valid && TryMeasureGameForward(headRotation, out frame))
+            {
+                _frame = frame;
+                _frameMeasured = true;
+                if (Mathf.Abs(_frameYaw) > 5f || _frameTilt > 5f)
+                {
+                    Log.InfoOnce("overlay-frame", string.Format("SteamVR's tracking space faces {0:0}° to the {1} of the game's forward (UUVR's head tracking); " +
+                        "the UI panel is turned to match. Press the recentre key ({2}) to measure it again.", Mathf.Abs(_frameYaw), _frameYaw < 0f ? "left" : "right",
+                        Settings.KeyRecenter.Value));
+                }
+            }
+
             _centerDistance = PanelLayout.Distance;
             _centerOffset = PanelLayout.HeightOffset;
-            _center = new Vector3(head.x, head.y + _centerOffset, head.z - _centerDistance);
+            _center = head + _frame.MultiplyVector(new Vector3(0f, _centerOffset, -_centerDistance));
             _needsRecenter = !valid;
-            Log.Verbose("SteamVR overlay centred at " + _center + " in " + _origin + (valid ? "" : " (headset pose not available yet, using a default height)"));
+            Log.Verbose("SteamVR overlay centred at " + _center + " in " + _origin + (valid ? "" : " (headset pose not available yet, using a default height)") +
+                        (_frameMeasured ? string.Format(", game forward {0:0.0}° yaw, {1:0.0}° tilt from the space's forward", _frameYaw, _frameTilt) : ""));
         }
 
-        private static bool TryGetHeadPosition(ETrackingUniverseOrigin origin, out Vector3 position)
+        /// <summary>
+        /// The game's forward in SteamVR's tracking space: the headset's rotation there, undone by its rotation relative
+        /// to the game camera (what UUVR turns the game camera by). SteamVR's spaces are level, so a small tilt is
+        /// measurement noise (the two rotations are read a moment apart) and is dropped, and so is a turn under 2°.
+        /// </summary>
+        private bool TryMeasureGameForward(Matrix4x4 headRotation, out Matrix4x4 frame)
+        {
+            frame = Matrix4x4.identity;
+            Quaternion relative;
+            if (!HeadAim.TryGetHeadRelativeToGameCamera(_camera, out relative)) return false;
+
+            // Unity looks along +Z (left-handed), OpenVR along -Z (right-handed): mirror Z.
+            Matrix4x4 relativeVr = MirrorZ(Matrix4x4.Rotate(relative));
+            Matrix4x4 measured = headRotation * relativeVr.transpose;
+
+            Vector3 forward = measured.MultiplyVector(new Vector3(0f, 0f, -1f));
+            _frameYaw = Mathf.Atan2(forward.x, -forward.z) * Mathf.Rad2Deg;
+            _frameTilt = Mathf.Acos(Mathf.Clamp(measured.m11, -1f, 1f)) * Mathf.Rad2Deg;
+            if (_frameTilt > 10f)
+            {
+                frame = measured;
+                return true;
+            }
+
+            var level = new Vector3(forward.x, 0f, forward.z);
+            if (level.sqrMagnitude < 1e-6f || Mathf.Abs(_frameYaw) < 2f) return true;
+            Vector3 back = -level.normalized;
+            Vector3 up = Vector3.up;
+            Vector3 right = Vector3.Cross(up, back);
+            frame.SetColumn(0, new Vector4(right.x, right.y, right.z, 0f));
+            frame.SetColumn(1, new Vector4(0f, 1f, 0f, 0f));
+            frame.SetColumn(2, new Vector4(back.x, back.y, back.z, 0f));
+            return true;
+        }
+
+        private static Matrix4x4 MirrorZ(Matrix4x4 m)
+        {
+            m.m02 = -m.m02;
+            m.m12 = -m.m12;
+            m.m20 = -m.m20;
+            m.m21 = -m.m21;
+            return m;
+        }
+
+        private static bool TryGetHeadPose(ETrackingUniverseOrigin origin, out Vector3 position, out Matrix4x4 rotation)
         {
             position = Vector3.zero;
+            rotation = Matrix4x4.identity;
             CVRSystem system = OpenVR.System;
             if (system == null) return false;
 
@@ -515,6 +598,9 @@ namespace VoidCrewVRUIFix
 
             HmdMatrix34_t pose = Poses[0].mDeviceToAbsoluteTracking;
             position = new Vector3(pose.m3, pose.m7, pose.m11);
+            rotation.m00 = pose.m0; rotation.m01 = pose.m1; rotation.m02 = pose.m2;
+            rotation.m10 = pose.m4; rotation.m11 = pose.m5; rotation.m12 = pose.m6;
+            rotation.m20 = pose.m8; rotation.m21 = pose.m9; rotation.m22 = pose.m10;
             return true;
         }
 

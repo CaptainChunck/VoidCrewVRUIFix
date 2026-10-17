@@ -111,6 +111,27 @@ namespace VoidCrewVRUIFix
             if (camera != null) camera.transform.rotation = original.Value;
         }
 
+        /// <summary>
+        /// The head's rotation relative to the game camera, as UUVR turns the camera for the headset (from its tracking
+        /// camera, which includes its "keep horizon level" option), or as the headset reports it.
+        /// </summary>
+        public static bool TryGetHeadRelativeToGameCamera(Camera camera, out Quaternion relative)
+        {
+            relative = Quaternion.identity;
+            if (camera == null) return false;
+            Quaternion view;
+            if (UuvrCompat.TryGetViewRotation(camera, out view))
+            {
+                relative = Quaternion.Inverse(camera.transform.rotation) * view;
+                return true;
+            }
+            Heads.Clear();
+            InputDevices.GetDevicesAtXRNode(XRNode.Head, Heads);
+            if (Heads.Count == 0) return false;
+            relative = HeadsetRotation();
+            return true;
+        }
+
         private static Quaternion HeadsetRotation()
         {
             Heads.Clear();
