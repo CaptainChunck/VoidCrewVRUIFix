@@ -142,10 +142,11 @@ namespace VoidCrewVRUIFix
                 Log.Verbose(string.Format("Turret view starts {0:0}° turned and {1:0}° tilted from the turret's mount.", _yaw, _pitch));
             }
 
-            // The mouse turns the view like it turns the turret: same amounts, and slower while zoomed in.
+            // The mouse turns the view like it turns the turret: same amounts, and slower while zoomed in. Not while the
+            // game shows its cursor (the ping wheel): the mouse picks on the wheel then.
             float zoom = (float)_zoomField.GetValue(pivot);
             UnityEngine.Object player = PlayerModes.LocalPlayer();
-            object input = player != null ? _playerInputProperty.GetValue(player, null) : null;
+            object input = player != null && UnityEngine.Cursor.lockState == CursorLockMode.Locked ? _playerInputProperty.GetValue(player, null) : null;
             if (input != null)
             {
                 var look = (Vector2)_lookVector.Invoke(input, NotSmoothed);

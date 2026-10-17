@@ -45,6 +45,8 @@ namespace VoidCrewVRUIFix
             PatchLookWithHead(harmony, "UI.Ping.PingAbility", "GetPingInfo", "head aim (quick ping)", applied, skipped);
             PatchLookWithHead(harmony, "UI.Ping.PingDefinition", "GetTarget", "head aim (ping wheel)", applied, skipped);
             PatchTurretAim(harmony, applied, skipped);
+            Patch(harmony, "PingMenu", "Open", null, nameof(PingWheelOpened), "head aim (ping wheel opened)", applied, skipped);
+            Patch(harmony, "PingMenu", "Close", nameof(PingWheelClosing), null, "head aim (ping wheel let go)", applied, skipped);
             // Always on, even when DLSS is hidden from the options: if DLSS still ends up running in VR (for example a
             // setting saved before the plugin was installed), HDRP's DLSS fails on every frame without it, and the
             // headset shows nothing.
@@ -328,6 +330,18 @@ namespace VoidCrewVRUIFix
         private static void TurretCamera(CinemachineBrainUpdater __instance)
         {
             if (TurretAim.Steering) TurretAim.AfterCameraUpdate(__instance);
+        }
+
+        // The ping wheel opened: while it stays open, its targets follow where you look (see PingWheel).
+        private static void PingWheelOpened(MonoBehaviour __instance)
+        {
+            PingWheel.Opened(__instance);
+        }
+
+        // The ping wheel is about to hand over the chosen ping: its targets are taken from where you look right now.
+        private static void PingWheelClosing(MonoBehaviour __instance)
+        {
+            PingWheel.Closing(__instance);
         }
 
         // Mouse positions are mapped onto a terminal screen that isn't attached to the camera.

@@ -167,15 +167,18 @@ namespace VoidCrewVRUIFix
             if (_display != null && !_display.IsAlive) StopDisplay("it stopped working (was VR restarted?)");
             if (_display == null && Time.unscaledTime >= _nextDisplayAttempt) StartDisplay();
 
-            // The game shows the cursor exactly when a menu, popup or terminal wants mouse input.
-            bool menuOpen = UnityEngine.Cursor.visible && UnityEngine.Cursor.lockState != CursorLockMode.Locked;
+            // The game shows the cursor exactly when a menu, popup or terminal wants mouse input, and while a wheel
+            // (pings, emotes) is held open. A wheel isn't a menu: head aim carries on, so the wheel stays where you look.
+            bool cursorShown = UnityEngine.Cursor.visible && UnityEngine.Cursor.lockState != CursorLockMode.Locked;
+            bool menuOpen = cursorShown && !PingWheel.CursorOnlyForWheel();
             // A terminal's screen is part of the world, so it isn't darkened like a menu.
             _capture.BackdropOpacity = menuOpen && !PanelLayout.OnTerminalScreen ? Settings.MenuBackdropOpacity.Value : 0f;
             _hud.Update(menuOpen, _fill.Current.a > 0.003f);
             _turretHud.Update(menuOpen, _fill.Current.a > 0.003f);
             HeadAim.Update(true, menuOpen);
+            PingWheel.Update();
             _desktop.UiInSceneImage = _display is InGamePanelDisplay;
-            _cursor.Update(Settings.ShowVrCursor.Value && menuOpen);
+            _cursor.Update(Settings.ShowVrCursor.Value && cursorShown);
             IntroVideo.Update();
 
             MarkerAlignment.PlayerCamera = _mainCamera;
@@ -282,6 +285,7 @@ namespace VoidCrewVRUIFix
             _hud.Stop();
             _turretHud.Stop();
             HeadAim.Stop();
+            PingWheel.Stop();
 
             // While the game is closing, Steam and the game's UI are already shutting down; leave them alone.
             if (_quitting) return;

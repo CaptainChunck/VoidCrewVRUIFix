@@ -132,6 +132,7 @@
     <Compile Include="IntroVideo.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="PanelLayout.cs" />
+    <Compile Include="PingWheel.cs" />
     <Compile Include="PixelFont.cs" />
     <Compile Include="PlayerModes.cs" />
     <Compile Include="RenderUtil.cs" />

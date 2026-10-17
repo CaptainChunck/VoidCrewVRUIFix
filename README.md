@@ -25,6 +25,7 @@ UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip:
 | The intro video doesn't show | The intro video plays on the panel |
 | In a turret, a dark box frames the UI and the turret doesn't shoot where the crosshair is | The dark border is hidden, and the turret turns to wherever you look, with the crosshair in the middle of your view |
 | The turret's readouts (ammo, heat, range, spread) stay on the screen in front of the turret | They follow your head like the player HUD, at a place you choose |
+| Holding the ping wheel snaps your view and the wheel back, and pings the wrong spot | The wheel stays where you look, and you can look around while it is open: the ping goes to what you look at when you let go |
 | Terminal screens follow your head and slide through the terminal and walls | Terminal screens stay on their terminals, like real screens, and the mouse pointer sits on the screen |
 | Full-screen screens (death screen, spawn screen, fades to black) only cover part of your view | They fill your whole view, with their text on the panel |
 | Low frame rate | UUVR's hidden helper cameras, which the game renders as full extra VR views, are turned off |
