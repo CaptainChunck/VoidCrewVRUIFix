@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# Never commit game, BepInEx or UUVR binaries; the build references them from the local install
+*.dll
+*.pdb
+*.exe
+
+# Local-only files
+VoidCrewVRUIFix/_backup/
