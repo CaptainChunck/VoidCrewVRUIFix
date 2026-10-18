@@ -213,6 +213,7 @@ namespace VoidCrewVRUIFix
         private static Camera _viewHelper;
         private static float _nextViewLookup;
         private static string _tracking;
+        private static bool _horizonLevel;
         private static float _nextTrackingCheck;
 
         /// <summary>
@@ -224,19 +225,70 @@ namespace VoidCrewVRUIFix
         {
             rotation = Quaternion.identity;
             if (camera == null || _vrCameraType == null) return false;
-
-            if (Time.unscaledTime >= _nextTrackingCheck)
-            {
-                _nextTrackingCheck = Time.unscaledTime + 1f;
-                _tracking = CameraTracking;
-            }
-            if (_tracking == "Absolute")
+            if (Tracking() == "Absolute")
             {
                 rotation = camera.transform.rotation;
                 return true;
             }
 
-            if (_childCameraField == null) return false;
+            Camera helper = ViewHelper(camera);
+            if (helper == null) return false;
+            rotation = helper.transform.rotation;
+            return true;
+        }
+
+        /// <summary>
+        /// The headset's rotation as UUVR last applied it: its tracking camera's rotation under the game camera, which is
+        /// the headset's rotation in Unity's tracking space. False with Absolute tracking or before UUVR's camera exists.
+        /// </summary>
+        public static bool TryGetHeadRotation(Camera camera, out Quaternion head)
+        {
+            head = Quaternion.identity;
+            if (camera == null || _vrCameraType == null || Tracking() == "Absolute") return false;
+            Camera helper = ViewHelper(camera);
+            if (helper == null) return false;
+            head = helper.transform.localRotation;
+            return true;
+        }
+
+        /// <summary>
+        /// The game camera's rotation in UUVR's tracking space, the space the headset turns the view in: none, or with
+        /// UUVR's "keep horizon level" the camera's tilt (UUVR then only follows the camera's heading).
+        /// </summary>
+        public static Quaternion CameraInTrackingSpace(Camera camera)
+        {
+            if (camera == null || !KeepsHorizonLevel()) return Quaternion.identity;
+            Quaternion rotation = camera.transform.rotation;
+            Vector3 heading = Vector3.ProjectOnPlane(rotation * Vector3.forward, Vector3.up);
+            if (heading.sqrMagnitude < 1e-6f) return Quaternion.identity;
+            return Quaternion.Inverse(Quaternion.LookRotation(heading, Vector3.up)) * rotation;
+        }
+
+        private static string Tracking()
+        {
+            RefreshTrackingSettings();
+            return _tracking;
+        }
+
+        private static bool KeepsHorizonLevel()
+        {
+            RefreshTrackingSettings();
+            return _horizonLevel;
+        }
+
+        // UUVR's tracking settings, read again once a second (the VR tab can change them).
+        private static void RefreshTrackingSettings()
+        {
+            if (Time.unscaledTime < _nextTrackingCheck) return;
+            _nextTrackingCheck = Time.unscaledTime + 1f;
+            _tracking = CameraTracking;
+            _horizonLevel = GetSetting("AlignCameraToHorizon") == "True";
+        }
+
+        /// <summary>UUVR's hidden tracking camera under the given game camera, or null.</summary>
+        private static Camera ViewHelper(Camera camera)
+        {
+            if (_childCameraField == null) return null;
             if (!ReferenceEquals(camera, _viewCamera) || (_viewHelper == null && Time.unscaledTime >= _nextViewLookup))
             {
                 _viewCamera = camera;
@@ -244,9 +296,7 @@ namespace VoidCrewVRUIFix
                 Component vrCamera = camera.GetComponent(_vrCameraType);
                 _viewHelper = vrCamera != null ? _childCameraField.GetValue(vrCamera) as Camera : null;
             }
-            if (_viewHelper == null || !_viewHelper.gameObject.activeInHierarchy) return false;
-            rotation = _viewHelper.transform.rotation;
-            return true;
+            return _viewHelper != null && _viewHelper.gameObject.activeInHierarchy ? _viewHelper : null;
         }
 
         /// <summary>Cameras UUVR creates for itself. They must never be picked as the player's camera.</summary>

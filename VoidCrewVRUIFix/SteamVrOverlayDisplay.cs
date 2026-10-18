@@ -26,6 +26,12 @@ namespace VoidCrewVRUIFix
         private const float FillHeadroom = 1f;
         private const float FillHalfAngle = 80f;
 
+        // SteamVR's space is measured against UUVR's head tracking while the head turns slower than this (degrees a
+        // second): the two head rotations are read for slightly different moments, which a turning head would add in.
+        // If the head never keeps still, it is measured roughly after this long, and again once it does.
+        private const float StillTurnSpeed = 10f;
+        private const float StillWaitSeconds = 3f;
+
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate void RenderEventCallback(int eventId, IntPtr data);
 
@@ -63,13 +69,24 @@ namespace VoidCrewVRUIFix
         private float _appliedFillDistance = -1f;
         private bool _needsRecenter = true;
         private Vector3 _center;
+        // Where the panel is placed around: the headset now, or where it was when the panel was last centred.
+        private Vector3 _headPosition;
+        private bool _headKnown;
 
-        // Which way the game's forward points in SteamVR's tracking space (OpenVR convention, rotation only), measured
-        // when the panel is centred. Identity when SteamVR's tracking space and UUVR's head tracking agree.
-        private Matrix4x4 _frame = Matrix4x4.identity;
+        // Which way SteamVR's tracking space faces compared with UUVR's head tracking (OpenVR convention, a turn about
+        // the vertical), measured while the head is still. Identity when the two agree.
+        private Matrix4x4 _spaceFrame = Matrix4x4.identity;
+        private bool _needsFrame = true;
+        private float _frameWaitStart = -1f;
         private bool _frameMeasured;
+        private bool _frameStill;
         private float _frameYaw;
         private float _frameTilt;
+        private float _frameTurnSpeed;
+        // Which way the game camera faces in SteamVR's tracking space this frame: the panel's rotation.
+        private Matrix4x4 _frame = Matrix4x4.identity;
+        private float _displayFrequency = -1f;
+        private float _vsyncToPhotons;
         private Camera _camera;
         private Matrix4x4 _appliedRotation = Matrix4x4.identity;
         private ETrackingUniverseOrigin _origin = ETrackingUniverseOrigin.TrackingUniverseStanding;
@@ -135,14 +152,16 @@ namespace VoidCrewVRUIFix
             get
             {
                 return string.Format(
-                    "handle 0x{0:X}, shown {1}, tracking space {2}, centre {3}{9}, frames submitted {4} ({5}), last SteamVR error {6}, background fill {7}{8}",
+                    "handle 0x{0:X}, shown {1}, tracking space {2}, centre {3} ({10}){9}, frames submitted {4} ({5}), last SteamVR error {6}, background fill {7}{8}",
                     _handle, _shown, _origin, _center, Interlocked.Read(ref _submitCount),
                     Settings.SubmitOverlayOnRenderThread.Value ? "render thread" : "main thread",
                     (EVROverlayError)_submitError,
                     _fillShown ? "shown " + _appliedFillDistance.ToString("0.0") + " m away" : "hidden",
                     _submitException != null ? ", last exception " + _submitException : "",
-                    _frameMeasured ? string.Format(", game forward {0:0}° to the {1} and {2:0}° tilted from the space's forward", Mathf.Abs(_frameYaw),
-                        _frameYaw < 0f ? "left" : "right", _frameTilt) : ", game forward not measured yet");
+                    _frameMeasured ? string.Format(", game forward {0:0}° to the {1} of the space's forward ({2}, {3:0.0}° off level, head turning {4:0}°/s)",
+                        Mathf.Abs(_frameYaw), _frameYaw < 0f ? "left" : "right", _frameStill ? "measured with the head still" : "rough, measuring again once the head is still",
+                        _frameTilt, _frameTurnSpeed) : ", game forward not measured yet",
+                    Settings.OverlayFollowsHeadPosition.Value ? "moves with your head's position" : "fixed in the room where it was centred");
             }
         }
 
@@ -358,6 +377,8 @@ namespace VoidCrewVRUIFix
         public void Recenter()
         {
             _needsRecenter = true;
+            _needsFrame = true;
+            _frameWaitStart = -1f;
         }
 
         public void Shutdown()
@@ -406,10 +427,7 @@ namespace VoidCrewVRUIFix
             }
             else
             {
-                if (_centerDistance != PanelLayout.Distance || _centerOffset != PanelLayout.HeightOffset) _needsRecenter = true;
-                if (_needsRecenter) RecenterNow();
-                position = _center;
-                rotation = _frame;
+                PlaceInRoom(out position, out rotation);
             }
 
             if (anchor == _appliedAnchor && position == _appliedPosition && rotation == _appliedRotation) return;
@@ -437,79 +455,129 @@ namespace VoidCrewVRUIFix
         }
 
         /// <summary>
-        /// Places the panel straight ahead along the game's forward, at the headset's current position, so the panel
-        /// (and the markers on it) lines up with the world when you turn your head. With UUVR's RelativeTransform
-        /// tracking the game's forward is normally the tracking space's own forward axis, but not when SteamVR's saved
-        /// forward (its seated or standing zero) differs from the one UUVR's head tracking uses: then the panel showed
-        /// far off to one side. So the game's forward is measured in SteamVR's space each time the panel is centred.
+        /// Where the panel goes while it stays in front of the game camera: straight ahead along the game camera's
+        /// direction, around the headset's position. UUVR draws the world with the head's turning but not its movement,
+        /// so the world moves along whenever the head moves, even when it only turns (the eyes swing round the neck). A
+        /// panel left where it was centred in the room slid against the world: on a terminal screen, half a metre away,
+        /// the mouse pointer drifted several icons off the button the mouse was on as you turned your head. So the panel
+        /// moves with the head's position too, to where the next picture shows it (Moves With Your Head Position).
         /// </summary>
-        private void RecenterNow()
+        private void PlaceInRoom(out Vector3 position, out Matrix4x4 rotation)
         {
-            CVRCompositor compositor = OpenVR.Compositor;
-            _origin = compositor != null ? compositor.GetTrackingSpace() : ETrackingUniverseOrigin.TrackingUniverseStanding;
+            bool follow = Settings.OverlayFollowsHeadPosition.Value;
+            if (!follow && (_centerDistance != PanelLayout.Distance || _centerOffset != PanelLayout.HeightOffset)) _needsRecenter = true;
+            if (_needsRecenter)
+            {
+                CVRCompositor compositor = OpenVR.Compositor;
+                _origin = compositor != null ? compositor.GetTrackingSpace() : ETrackingUniverseOrigin.TrackingUniverseStanding;
+            }
 
             Vector3 head;
             Matrix4x4 headRotation;
-            bool valid = TryGetHeadPose(_origin, out head, out headRotation);
-            if (!valid)
+            float turnSpeed;
+            bool valid = TryGetHeadPose(_origin, follow ? PredictedSecondsToPhotons() : 0f, out head, out headRotation, out turnSpeed);
+            if (valid && _needsFrame) MeasureSpaceFrame(headRotation, turnSpeed);
+            if (valid && (follow || _needsRecenter))
             {
-                head = new Vector3(0f, _origin == ETrackingUniverseOrigin.TrackingUniverseStanding ? 1.6f : 0f, 0f);
+                _headPosition = head;
+                _headKnown = true;
+            }
+            else if (!_headKnown)
+            {
+                _headPosition = new Vector3(0f, _origin == ETrackingUniverseOrigin.TrackingUniverseStanding ? 1.6f : 0f, 0f);
+            }
+            if (_needsRecenter)
+            {
+                _needsRecenter = !valid;
+                _centerDistance = PanelLayout.Distance;
+                _centerOffset = PanelLayout.HeightOffset;
+                Log.Verbose("SteamVR overlay centred around " + _headPosition + " in " + _origin +
+                            (valid ? "" : " (headset pose not available yet, using a default height)") +
+                            (follow ? ", moving with the head's position" : ", fixed in the room"));
             }
 
-            Matrix4x4 frame;
-            if (valid && TryMeasureGameForward(headRotation, out frame))
-            {
-                _frame = frame;
-                _frameMeasured = true;
-                if (Mathf.Abs(_frameYaw) > 5f || _frameTilt > 5f)
-                {
-                    Log.InfoOnce("overlay-frame", string.Format("SteamVR's tracking space faces {0:0}° to the {1} of the game's forward (UUVR's head tracking); " +
-                        "the UI panel is turned to match. Press the recentre key ({2}) to measure it again.", Mathf.Abs(_frameYaw), _frameYaw < 0f ? "left" : "right",
-                        Settings.KeyRecenter.Value));
-                }
-            }
-
-            _centerDistance = PanelLayout.Distance;
-            _centerOffset = PanelLayout.HeightOffset;
-            _center = head + _frame.MultiplyVector(new Vector3(0f, _centerOffset, -_centerDistance));
-            _needsRecenter = !valid;
-            Log.Verbose("SteamVR overlay centred at " + _center + " in " + _origin + (valid ? "" : " (headset pose not available yet, using a default height)") +
-                        (_frameMeasured ? string.Format(", game forward {0:0.0}° yaw, {1:0.0}° tilt from the space's forward", _frameYaw, _frameTilt) : ""));
+            // SteamVR's space turned to UUVR's head tracking, then the game camera's rotation there (none, unless UUVR
+            // keeps the horizon level: then the camera's tilt). Unity looks along +Z, OpenVR along -Z: mirror Z.
+            _frame = _spaceFrame * MirrorZ(Matrix4x4.Rotate(UuvrCompat.CameraInTrackingSpace(_camera)));
+            _center = _headPosition + _frame.MultiplyVector(new Vector3(0f, PanelLayout.HeightOffset, -PanelLayout.Distance));
+            position = _center;
+            rotation = _frame;
         }
 
         /// <summary>
-        /// The game's forward in SteamVR's tracking space: the headset's rotation there, undone by its rotation relative
-        /// to the game camera (what UUVR turns the game camera by). SteamVR's spaces are level, so a small tilt is
-        /// measurement noise (the two rotations are read a moment apart) and is dropped, and so is a turn under 2°.
+        /// Which way SteamVR's tracking space faces compared with UUVR's head tracking: the headset's rotation in SteamVR's
+        /// space, undone by its rotation as UUVR applies it. They differ when SteamVR's saved forward (its seated or
+        /// standing zero) isn't the one UUVR's head tracking uses; then the panel showed far off to one side. Measured on
+        /// the first frames and on the recentre key, once the head is nearly still. Both spaces are level, so only the
+        /// turn about the vertical is kept, and under half a degree counts as none.
         /// </summary>
-        private bool TryMeasureGameForward(Matrix4x4 headRotation, out Matrix4x4 frame)
+        private void MeasureSpaceFrame(Matrix4x4 headRotation, float turnSpeed)
         {
-            frame = Matrix4x4.identity;
-            Quaternion relative;
-            if (!HeadAim.TryGetHeadRelativeToGameCamera(_camera, out relative)) return false;
+            bool still = turnSpeed < StillTurnSpeed;
+            if (!still)
+            {
+                if (_frameWaitStart < 0f) _frameWaitStart = Time.unscaledTime;
+                if (_frameMeasured || Time.unscaledTime - _frameWaitStart < StillWaitSeconds) return;
+            }
 
-            // Unity looks along +Z (left-handed), OpenVR along -Z (right-handed): mirror Z.
-            Matrix4x4 relativeVr = MirrorZ(Matrix4x4.Rotate(relative));
-            Matrix4x4 measured = headRotation * relativeVr.transpose;
+            Quaternion head;
+            if (!UuvrCompat.TryGetHeadRotation(_camera, out head) && !HeadAim.TryGetHeadRelativeToGameCamera(_camera, out head)) return;
 
+            Matrix4x4 measured = headRotation * MirrorZ(Matrix4x4.Rotate(head)).transpose;
             Vector3 forward = measured.MultiplyVector(new Vector3(0f, 0f, -1f));
             _frameYaw = Mathf.Atan2(forward.x, -forward.z) * Mathf.Rad2Deg;
             _frameTilt = Mathf.Acos(Mathf.Clamp(measured.m11, -1f, 1f)) * Mathf.Rad2Deg;
-            if (_frameTilt > 10f)
-            {
-                frame = measured;
-                return true;
-            }
+            _frameTurnSpeed = turnSpeed;
 
+            Matrix4x4 frame = Matrix4x4.identity;
             var level = new Vector3(forward.x, 0f, forward.z);
-            if (level.sqrMagnitude < 1e-6f || Mathf.Abs(_frameYaw) < 2f) return true;
-            Vector3 back = -level.normalized;
-            Vector3 up = Vector3.up;
-            Vector3 right = Vector3.Cross(up, back);
-            frame.SetColumn(0, new Vector4(right.x, right.y, right.z, 0f));
-            frame.SetColumn(1, new Vector4(0f, 1f, 0f, 0f));
-            frame.SetColumn(2, new Vector4(back.x, back.y, back.z, 0f));
-            return true;
+            if (level.sqrMagnitude > 1e-6f && Mathf.Abs(_frameYaw) >= 0.5f)
+            {
+                Vector3 back = -level.normalized;
+                Vector3 right = Vector3.Cross(Vector3.up, back);
+                frame.SetColumn(0, new Vector4(right.x, right.y, right.z, 0f));
+                frame.SetColumn(1, new Vector4(0f, 1f, 0f, 0f));
+                frame.SetColumn(2, new Vector4(back.x, back.y, back.z, 0f));
+            }
+            _spaceFrame = frame;
+            _frameMeasured = true;
+            _frameStill = still;
+            _needsFrame = !still;
+            _frameWaitStart = -1f;
+
+            if (Mathf.Abs(_frameYaw) > 5f)
+            {
+                Log.InfoOnce("overlay-frame", string.Format("SteamVR's tracking space faces {0:0}° to the {1} of the game's forward (UUVR's head tracking); " +
+                    "the UI panel is turned to match. Press the recentre key ({2}) to measure it again.", Mathf.Abs(_frameYaw), _frameYaw < 0f ? "left" : "right",
+                    Settings.KeyRecenter.Value));
+            }
+            Log.Verbose(string.Format("SteamVR's tracking space measured: game forward {0:0.0}° yaw, {1:0.0}° off level, head turning {2:0}°/s{3}.",
+                _frameYaw, _frameTilt, turnSpeed, still ? "" : " (rough: the head kept turning; measuring again once it is still)"));
+        }
+
+        /// <summary>
+        /// How far ahead the headset's next picture is shown: the rest of this refresh plus the display's own delay, the
+        /// usual OpenVR prediction for a pose that should match what is on screen.
+        /// </summary>
+        private float PredictedSecondsToPhotons()
+        {
+            CVRSystem system = OpenVR.System;
+            if (system == null) return 0f;
+            if (_displayFrequency < 0f)
+            {
+                ETrackedPropertyError error = ETrackedPropertyError.TrackedProp_Success;
+                _displayFrequency = system.GetFloatTrackedDeviceProperty(OpenVR.k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty.Prop_DisplayFrequency_Float, ref error);
+                if (error != ETrackedPropertyError.TrackedProp_Success) _displayFrequency = 0f;
+                error = ETrackedPropertyError.TrackedProp_Success;
+                _vsyncToPhotons = system.GetFloatTrackedDeviceProperty(OpenVR.k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty.Prop_SecondsFromVsyncToPhotons_Float, ref error);
+                if (error != ETrackedPropertyError.TrackedProp_Success) _vsyncToPhotons = 0f;
+            }
+            if (_displayFrequency < 1f) return 0f;
+
+            float sinceVsync = 0f;
+            ulong frameCounter = 0;
+            if (!system.GetTimeSinceLastVsync(ref sinceVsync, ref frameCounter)) return 0f;
+            return Mathf.Clamp(1f / _displayFrequency - sinceVsync + _vsyncToPhotons, 0f, 0.05f);
         }
 
         private static Matrix4x4 MirrorZ(Matrix4x4 m)
@@ -521,15 +589,20 @@ namespace VoidCrewVRUIFix
             return m;
         }
 
-        private static bool TryGetHeadPose(ETrackingUniverseOrigin origin, out Vector3 position, out Matrix4x4 rotation)
+        /// <summary>The headset's pose in SteamVR's space, predicted this far ahead, and how fast it is turning (degrees a second).</summary>
+        private static bool TryGetHeadPose(ETrackingUniverseOrigin origin, float predictSeconds, out Vector3 position, out Matrix4x4 rotation, out float turnSpeed)
         {
             position = Vector3.zero;
             rotation = Matrix4x4.identity;
+            turnSpeed = 0f;
             CVRSystem system = OpenVR.System;
             if (system == null) return false;
 
-            system.GetDeviceToAbsoluteTrackingPose(origin, 0f, Poses);
+            system.GetDeviceToAbsoluteTrackingPose(origin, predictSeconds, Poses);
             if (!Poses[0].bPoseIsValid) return false;
+
+            HmdVector3_t spin = Poses[0].vAngularVelocity;
+            turnSpeed = Mathf.Sqrt(spin.v0 * spin.v0 + spin.v1 * spin.v1 + spin.v2 * spin.v2) * Mathf.Rad2Deg;
 
             HmdMatrix34_t pose = Poses[0].mDeviceToAbsoluteTracking;
             position = new Vector3(pose.m3, pose.m7, pose.m11);

@@ -478,7 +478,8 @@ namespace VoidCrewVRUIFix
                         }
                         else
                         {
-                            source.DocumentField = AccessTools.Field(source.Type, "Doc");
+                            // Some HUDs keep their document in a Doc field, others only as a component (no HarmonyX warning for those).
+                            source.DocumentField = FindField(source.Type, "Doc");
                             if (source.DocumentField != null && source.DocumentField.FieldType != typeof(UIDocument)) source.DocumentField = null;
                         }
                     }
@@ -489,6 +490,18 @@ namespace VoidCrewVRUIFix
                 any = true;
             }
             return any;
+        }
+
+        /// <summary>A field of the type or one of its base types, or null.</summary>
+        private static FieldInfo FindField(Type type, string name)
+        {
+            const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+            for (; type != null; type = type.BaseType)
+            {
+                FieldInfo field = type.GetField(name, Any);
+                if (field != null) return field;
+            }
+            return null;
         }
 
         private static void AddContent(VisualElement element, Rect panelRect, ref Rect bounds, ref bool any)

@@ -26,7 +26,7 @@ UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip:
 | In a turret, a dark box frames the UI and the turret doesn't shoot where the crosshair is | The dark border is hidden, and the turret turns to wherever you look, with the crosshair in the middle of your view |
 | HUD pieces stay stuck on the UI screen, out of view when you look around | Each piece (player HUD, ship status, objectives, turret crosshair, turret ammo and range, weapon stats, FPS counter) can follow your head, placed in the Modify UI window |
 | Holding the ping wheel snaps your view and the wheel back, and pings the wrong spot | The wheel stays where you look, and you can look around while it is open: the ping goes to what you look at when you let go |
-| Terminal screens follow your head and slide through the terminal and walls | Terminal screens stay on their terminals, like real screens, and the mouse pointer sits on the screen |
+| Terminal screens follow your head and slide through the terminal and walls | Terminal screens stay on their terminals, like real screens, and the mouse pointer sits on the screen, on the button it points at even when you turn your head |
 | Full-screen screens (death screen, spawn screen, fades to black) only cover part of your view | They fill your whole view, with their text on the panel |
 | Low frame rate | UUVR's hidden helper cameras, which the game renders as full extra VR views, are turned off |
 
@@ -200,6 +200,7 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Width (degrees) | 51 | How much of your view the panel covers |
 | UI Panel → Height Offset | -0.1 | Moves the panel up or down, in metres. Not used in the ship's outside cameras or in turrets aimed with the mouse, so the crosshair lines up with the guns |
 | UI Panel → Anchor | GameCamera | `GameCamera` keeps the panel in front of the in-game view, so markers line up and you can look around it. `Head` locks it to your head |
+| UI Panel → Moves With Your Head Position | true | SteamVR overlay only. UUVR draws the world with your head's turning but not its movement, so the world moves along when you lean or turn your head. The panel moves along too, so the mouse pointer stays on the button it points at (most noticeable on terminal screens). `false` leaves the panel where it was centred in the room |
 | Aiming → Aim With Your Head | true | The crosshair stays in the middle of your view while you play, and weapons, tools and interactions aim where you look. In a turret, the turret turns to where you look |
 | Player HUD, Ship Status, Objectives, Turret Crosshair, Turret HUD, Weapon Stats → Follows Your Head | true | Locks that piece to your head; its Left/Right, Up/Down (degrees), Distance (metres) and Size place it (defaults in [The Modify UI window](#the-modify-ui-window)). Turret HUD is the turret's ammo and range readouts. The Modify UI window sets all of these |
 | FPS Counter → Left/Right, Up/Down, Distance, Size | -17, 15, 0.6, 1.2 | Where the frame-rate counter sits |

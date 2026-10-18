@@ -41,6 +41,7 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<float> PanelWidthDegrees;
         public static ConfigEntry<float> PanelHeightOffset;
         public static ConfigEntry<PanelAnchor> Anchor;
+        public static ConfigEntry<bool> OverlayFollowsHeadPosition;
         public static ConfigEntry<float> MenuBackdropOpacity;
         public static ConfigEntry<bool> FlipVertically;
 
@@ -136,6 +137,11 @@ namespace VoidCrewVRUIFix
             Anchor = config.Bind("UI Panel", "Anchor", PanelAnchor.GameCamera,
                 "GameCamera: the panel stays in front of the in-game view direction, so you can look around it and markers line up with the world.\n" +
                 "Head: the panel is locked to your head and always stays in front of your eyes.");
+            OverlayFollowsHeadPosition = config.Bind("UI Panel", "Moves With Your Head Position", true,
+                "SteamVR overlay only, while the panel stays in front of the game camera. UUVR draws the game world with your head's turning but not " +
+                "its movement, so the world moves along when you lean, and even when you only turn your head (your eyes swing round your neck). " +
+                "On: the panel moves along too, so the mouse pointer stays on the button it points at, which matters most on terminal screens. " +
+                "Off: the panel stays where it was centred in the room.");
             MenuBackdropOpacity = config.Bind("UI Panel", "Menu Backdrop Opacity", 0f,
                 new ConfigDescription("Darkens the game world behind menus and terminals while one is open (shown as 'Darken World Behind Menus' in the VR tab). " +
                     "0 = off. Try 0.3 if menu text is hard to read against bright scenes. At 1 the world behind menus is completely black; the VR tab stops at 0.8.",
