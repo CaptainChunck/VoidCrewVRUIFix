@@ -15,3 +15,6 @@ obj/
 
 # Local-only files
 VoidCrewVRUIFix/_backup/
+
+# Thunderstore package output
+dist/

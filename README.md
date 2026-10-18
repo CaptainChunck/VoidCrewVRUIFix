@@ -1,10 +1,14 @@
 # Void Crew VR UI Fix
 
+<img src="thunderstore/icon.png" alt="Void Crew VR UI Fix" width="160" align="right">
+
 A [BepInEx](https://github.com/BepInEx/BepInEx) plugin that makes **Void Crew**'s menus and HUD work properly in VR when you play it with [UUVR](https://github.com/Raicuparta/uuvr), installed through [Rai Pal](https://github.com/Raicuparta/rai-pal).
 
 UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip: menus leave ghost copies behind, markers smear across the screen, there's no mouse cursor, and the desktop window goes black. This plugin fixes that. It's a single DLL that sits next to UUVR, and you don't need to change any UUVR settings.
 
-> **Status: early testing.** Main menu and basic gameplay are being tested. Please [report problems](#reporting-a-problem).
+> **Status: beta.** Tested with SteamVR on an HTC VIVE Pro 2. Please [report problems](#reporting-a-problem).
+
+**Download:** [`VoidCrewVRUIFix.dll` from the latest release](../../releases/latest) (see [Installation](#installation)). What's new: [CHANGELOG.md](CHANGELOG.md).
 
 <!-- SCREENSHOT: docs/images/hero.png (main menu in the headset with the UI panel and cursor)
 ![Void Crew main menu in VR with the UI fix](docs/images/hero.png)
@@ -258,7 +262,7 @@ Press **F9** in game to check: the **Performance** section of the report shows h
 - Keyboard and mouse only. Motion controllers aren't supported yet.
 - Multiplayer hasn't been tested much yet.
 - Each eye is drawn in its own pass (multi-pass). Single-pass stereo was tried and doesn't work with Void Crew and UUVR: the two eyes' views didn't turn together.
-- FSR3 is hidden in VR: the game's FSR3 has no VR support and would blur the two eyes into each other. DLSS can be tried with the experimental **Allow DLSS** toggle in the VR tab.
+- FSR3 is hidden in VR: the game's FSR3 has no VR support and would blur the two eyes into each other. DLSS works in VR but is experimental; **Allow DLSS** in the VR tab removes it from the options if it causes problems.
 
 ## Uninstalling
 
@@ -267,18 +271,28 @@ Delete `VoidCrewVRUIFix.dll` from the `BepInEx\plugins` folder. To remove VR com
 ## Building from source
 
 1. Install Visual Studio 2022 or newer with the **.NET desktop development** workload (.NET Framework 4.8).
-2. Install Void Crew, and install UUVR Mono Modern for it with Rai Pal (the build references the game's, BepInEx's and UUVR's DLLs).
+2. Install Void Crew, and install UUVR Mono Modern for it with Rai Pal. The build references the game's, BepInEx's and UUVR's DLLs from your PC; none of them are in this repository.
 3. Open `VoidCrewVRUIFix/VoidCrewVRUIFix.csproj` and set the two paths at the top to match your PC:
    - `VoidCrewDir`: the Void Crew install folder.
    - `BepInExDir`: the Rai Pal BepInEx folder for Void Crew. The `target_assembly` line in `Void Crew\doorstop_config.ini` shows where it is.
+
+   Or leave the file alone and pass them on the command line: `msbuild VoidCrewVRUIFix/VoidCrewVRUIFix.csproj -p:Configuration=Release -p:VoidCrewDir="D:\Games\Void Crew" -p:BepInExDir="<Rai Pal's BepInEx folder>"`
 4. Build the **Release** configuration. The plugin is `VoidCrewVRUIFix/bin/Release/VoidCrewVRUIFix.dll`.
+5. Optional: `powershell -NoProfile -ExecutionPolicy Bypass -File thunderstore\make-package.ps1` makes the Thunderstore package, `dist\Void_Crew_VR_UI_Fix-<version>.zip`, from the Release build and the files in `thunderstore` (`manifest.json`, `README.md`, `icon.png`). `thunderstore\make-icon.ps1` redraws the icon.
 
 ### How it works
 
 - **UI capture:** while VR is on, after the game's renderer (HDRP) finishes each frame, the plugin asks Unity to draw all screen-space UI (UI Toolkit panels and uGUI canvases) once more into a texture that is cleared every frame.
 - **Display:** the texture goes to the headset as a SteamVR overlay (OpenVR) or as a quad drawn by an HDRP custom pass after post-processing (OpenXR).
-- **Markers:** `Camera.WorldToViewportPoint` is re-projected for the player camera so markers land in the right place on the panel.
+- **Markers:** `Camera.WorldToViewportPoint` and the other screen/world conversions are re-projected for the player camera, so markers, pings and terminal clicks land in the right place on the panel.
+- **HUD pieces:** each head-locked piece (player HUD, ship status, objectives, turret pieces, weapon stats) is copied out of the captured UI texture and shown as its own picture locked to the head, where the Modify UI window placed it.
+- **Head aim:** the game aims along its camera's forward direction, so while it aims (weapons, interactions, pings) the camera is briefly turned to where you look. Turrets get aim input towards the point you look at.
+- **SteamVR overlay placement:** UUVR draws the world with the head's turning but not its movement, so the overlay follows the headset's position (not its rotation) and stays lined up with the world.
 - **UUVR:** the plugin talks to UUVR only through reflection, so a UUVR update can't stop it from loading. UUVR's own UI handling and its hidden helper cameras are switched off as they start, through Harmony hooks on UUVR's start-up.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 
