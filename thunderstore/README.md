@@ -45,7 +45,7 @@ Open **Settings** in the game and pick the **VR** tab (next to GRAPHICS). Click 
 
 ## Problems and source code
 
-The full guide, the source code and bug reports are on GitHub: https://github.com/CaptainChunck/VoidCrewVRUIFix
+The full guide, the source code (GPL-3.0) and bug reports are on GitHub: https://github.com/CaptainChunck/VoidCrewVRUIFix
 
 When something goes wrong, press **F9** in game, then attach `BepInEx\LogOutput.log` to your report.
 

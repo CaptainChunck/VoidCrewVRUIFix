@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Void Crew VR UI Fix")]
 [assembly: AssemblyDescription("BepInEx plugin that fixes the UI of Void Crew when played in VR with UUVR")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Atlas Playbook v0.5.0")]
+[assembly: AssemblyCompany("CaptainChunck")]
 [assembly: AssemblyProduct("VoidCrewVRUIFix")]
-[assembly: AssemblyCopyright("Copyright © Atlas Playbook v0.5.0 2026")]
+[assembly: AssemblyCopyright("Copyright © 2026 CaptainChunck. Licensed under the GPL-3.0.")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

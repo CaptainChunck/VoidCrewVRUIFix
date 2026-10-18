@@ -294,6 +294,10 @@ Delete `VoidCrewVRUIFix.dll` from the `BepInEx\plugins` folder. To remove VR com
 
 See [CHANGELOG.md](CHANGELOG.md).
 
+## License
+
+This mod's source code is released under the [GNU General Public License v3.0](LICENSE). Void Crew, UUVR, BepInEx and HarmonyX aren't part of this repository and keep their own licenses.
+
 ## Credits
 
 - [Raicuparta](https://github.com/Raicuparta) for [UUVR](https://github.com/Raicuparta/uuvr) and [Rai Pal](https://github.com/Raicuparta/rai-pal).
