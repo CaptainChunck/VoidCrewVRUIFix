@@ -278,7 +278,8 @@ Delete `VoidCrewVRUIFix.dll` from the `BepInEx\plugins` folder. To remove VR com
 
    Or leave the file alone and pass them on the command line: `msbuild VoidCrewVRUIFix/VoidCrewVRUIFix.csproj -p:Configuration=Release -p:VoidCrewDir="D:\Games\Void Crew" -p:BepInExDir="<Rai Pal's BepInEx folder>"`
 4. Build the **Release** configuration. The plugin is `VoidCrewVRUIFix/bin/Release/VoidCrewVRUIFix.dll`.
-5. Optional: `powershell -NoProfile -ExecutionPolicy Bypass -File thunderstore\make-package.ps1` makes the Thunderstore package, `dist\Void_Crew_VR_UI_Fix-<version>.zip`, from the Release build and the files in `thunderstore` (`manifest.json`, `README.md`, `icon.png`). `thunderstore\make-icon.ps1` redraws the icon.
+5. Test it without starting the game: `powershell -NoProfile -ExecutionPolicy Bypass -File testsuild-and-test.ps1` builds the plugin, then checks it against the real game, HDRP and UUVR assemblies (its Harmony patches, every game member it uses, and the defaults a new install gets). It ends with **ALL CHECKS PASSED**. Pass `-VoidCrewDir` and `-BepInExDir` if your folders differ.
+6. Optional: `powershell -NoProfile -ExecutionPolicy Bypass -File thunderstore\make-package.ps1` makes the Thunderstore package, `dist\Void_Crew_VR_UI_Fix-<version>.zip`, from the Release build and the files in `thunderstore` (`manifest.json`, `README.md`, `icon.png`). `thunderstore\make-icon.ps1` redraws the icon.
 
 ### How it works
 
