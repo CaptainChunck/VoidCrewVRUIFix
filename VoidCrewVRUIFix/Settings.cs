@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine.InputSystem;
@@ -104,24 +105,32 @@ namespace VoidCrewVRUIFix
 
         private const int CurrentSettingsVersion = 4;
 
+        /// <summary>True when the plugin had no settings file yet: the first start after installing it.</summary>
+        public static bool FirstStart { get; private set; }
+
+        // The defaults are the tested VR setup: the SteamVR overlay, a 51° UI screen 1.2 m away, and every HUD piece
+        // locked to the head where the Modify UI window placed it. A new install starts with them, and RESTORE on the
+        // VR tab puts them back (see RestoreVrDefaults).
         public static void Bind(ConfigFile config)
         {
+            FirstStart = !File.Exists(config.ConfigFilePath);
+
             Enabled = config.Bind("General", "Enabled", true,
                 "Master switch for the whole plugin.");
-            DisplayMode = config.Bind("General", "UI Display Mode", UiDisplayMode.Auto,
+            DisplayMode = config.Bind("General", "UI Display Mode", UiDisplayMode.SteamVROverlay,
                 "How the game UI is shown in the headset.\n" +
                 "Auto: SteamVR overlay when UUVR uses OpenVR, otherwise the in-game panel.\n" +
-                "SteamVROverlay: sharpest result, drawn by SteamVR on top of the game (OpenVR only).\n" +
+                "SteamVROverlay: sharpest result, drawn by SteamVR on top of the game (OpenVR only; with OpenXR the in-game panel is used instead).\n" +
                 "InGamePanel: drawn into the game image (works with OpenVR and OpenXR).");
 
-            PanelDistance = config.Bind("UI Panel", "Distance", 1.5f,
+            PanelDistance = config.Bind("UI Panel", "Distance", 1.2f,
                 new ConfigDescription("Distance of the UI panel from your eyes, in metres.",
                     new AcceptableValueRange<float>(0.5f, 5f)));
-            PanelWidthDegrees = config.Bind("UI Panel", "Width (degrees)", 70f,
+            PanelWidthDegrees = config.Bind("UI Panel", "Width (degrees)", 51f,
                 new ConfigDescription("How much of your view the UI panel covers horizontally. " +
                     "World markers and pings are re-projected so they still line up with objects.",
                     new AcceptableValueRange<float>(30f, 120f)));
-            PanelHeightOffset = config.Bind("UI Panel", "Height Offset", 0f,
+            PanelHeightOffset = config.Bind("UI Panel", "Height Offset", -0.1f,
                 new ConfigDescription("Moves the panel up (positive) or down (negative), in metres.",
                     new AcceptableValueRange<float>(-1f, 1f)));
             Anchor = config.Bind("UI Panel", "Anchor", PanelAnchor.GameCamera,
@@ -140,35 +149,35 @@ namespace VoidCrewVRUIFix
                 "In a turret, the turret turns to wherever you look and the mouse turns your view. " +
                 "Off: you aim with the mouse only and the crosshair stays in front of the game camera.");
             PlayerHud = BindPlacement(config, "Player HUD", "PLAYER HUD", "the player status HUD (portrait, health, oxygen, temperature, key hints and the class ability)",
-                true, -20f, -18f, 1f, 1f);
+                true, -8f, -21f, 0.6f, 1.5f);
             HudFollowsHead = PlayerHud.FollowsHead;
             HudLeftRight = PlayerHud.LeftRight;
             HudUpDown = PlayerHud.UpDown;
             HudDistance = PlayerHud.Distance;
             HudSize = PlayerHud.Size;
             ShipStatus = BindPlacement(config, "Ship Status", "SHIP STATUS", "the ship's status (hull, power, alloys and biomass)",
-                true, -28f, 16f, 1f, 0.8f);
+                true, 24f, -6f, 0.5f, 1.9f);
             Objectives = BindPlacement(config, "Objectives", "OBJECTIVES", "the mission objectives",
-                true, 28f, 14f, 1f, 0.8f);
+                true, 17f, -19f, 0.6f, 1.7f);
             TurretCrosshair = BindPlacement(config, "Turret Crosshair", "TURRET CROSSHAIR",
                 "a turret's crosshair and aiming frame while you control it, with the warnings next to it. With Aim With Your Head, the turret aims through it",
-                true, 0f, 0f, 1f, 1f);
+                true, 0f, 1f, 0.6f, 2f);
             TurretReadouts = BindPlacement(config, "Turret HUD", "TURRET AMMO AND RANGE",
                 "a turret's readouts while you control it (heat or charge, ammo, range, spread and the turret's direction)",
-                true, 0f, -22f, 1f, 0.8f);
+                true, 0f, -13f, 0.6f, 1.7f);
             TurretHudFollowsHead = TurretReadouts.FollowsHead;
             TurretHudLeftRight = TurretReadouts.LeftRight;
             TurretHudUpDown = TurretReadouts.UpDown;
             TurretHudDistance = TurretReadouts.Distance;
             TurretHudSize = TurretReadouts.Size;
             WeaponStats = BindPlacement(config, "Weapon Stats", "WEAPON STATS", "a turret's weapon stats list while you control it (damage, fire rate, range and its mods)",
-                true, 30f, -8f, 1f, 0.8f);
+                true, 17f, 5f, 0.5f, 1.9f);
             FpsPlacement = BindPlacement(config, "FPS Counter", "FPS COUNTER", "the frame-rate counter (Performance > FPS Counter In Headset turns it on)",
-                null, -15f, 12f, 1f, 1f);
+                null, -17f, 15f, 0.6f, 1.2f);
 
             ShowVrCursor = config.Bind("Cursor", "Show VR Cursor", true,
                 "Draws the mouse cursor on the UI panel whenever the game shows a cursor (menus, terminals).");
-            CursorScale = config.Bind("Cursor", "Cursor Scale", 1f,
+            CursorScale = config.Bind("Cursor", "Cursor Scale", 1.8f,
                 new ConfigDescription("Size multiplier for the VR cursor.", new AcceptableValueRange<float>(0.5f, 4f)));
             HideHardwareCursor = config.Bind("Cursor", "Hide Windows Cursor", true,
                 "Hides the normal Windows cursor while in VR so you don't see two cursors on the desktop window.");
@@ -191,9 +200,9 @@ namespace VoidCrewVRUIFix
             HideWheelBackdrop = config.Bind("Fixes", "Hide Wheel Backdrop", true,
                 "Hides the dark layer the game puts over the whole screen while the ping wheel (or another wheel) is held open. " +
                 "On a monitor it dims the world; in VR it made the UI screen and the head-locked HUDs dark boxes.");
-            DisableDlss = config.Bind("Fixes", "Disable DLSS", true,
-                "Removes DLSS from the graphics options while UUVR is installed. Set to false to try DLSS in VR (experimental): " +
-                "restart the game, then pick DLSS under Graphics > Upscaling. DLSS then only runs on the player camera.");
+            DisableDlss = config.Bind("Fixes", "Disable DLSS", false,
+                "Removes DLSS from the graphics options while UUVR is installed. False (default): DLSS stays in Graphics > Upscaling, " +
+                "experimental in VR, and only runs on the player camera. Set to true and restart the game if DLSS causes problems in VR.");
             DisableFsr3 = config.Bind("Fixes", "Disable FSR3", true,
                 "Removes FSR3 from the graphics options while UUVR is installed. FSR3 is not built for VR rendering.");
             DisableUuvrUi = config.Bind("Fixes", "Disable UUVR UI", true,
@@ -206,7 +215,7 @@ namespace VoidCrewVRUIFix
                 "PanelView: what the headset shows (right eye), with the UI panel and cursor drawn where they appear in VR. You can play from it.\n" +
                 "HeadsetMirror: Unity's own mirror of the right eye (zoomed in, no UI).\n" +
                 "UiOnly: just the UI and cursor, full size, on black.");
-            DesktopViewWidth = config.Bind("Fixes", "Desktop View Width (degrees)", 90f,
+            DesktopViewWidth = config.Bind("Fixes", "Desktop View Width (degrees)", 100f,
                 new ConfigDescription("How wide a view the game window shows in PanelView mode. Limited to what the headset renders.",
                     new AcceptableValueRange<float>(30f, 170f)));
             DesktopViewHeight = config.Bind("Fixes", "Desktop View Height (degrees)", 0f,
@@ -226,7 +235,7 @@ namespace VoidCrewVRUIFix
                 "Turns off the monitor's V-Sync and the game's frame limit while VR is on, so they can't hold back the headset's frame rate " +
                 "(SteamVR paces the frames). The game's own settings come back when VR is turned off.");
             ShowFpsCounter = config.Bind("Performance", "FPS Counter In Headset", false,
-                "Shows the game's frame rate in the top left of your view in the headset. Green: the headset's full refresh rate. " +
+                "Shows the game's frame rate in your view in the headset (top left; the Modify UI window moves it). Green: the headset's full refresh rate. " +
                 "Yellow: half of it or more. Red: lower.");
             DlssCameraJitter = config.Bind("Performance", "DLSS Camera Jitter", true,
                 "Gives DLSS the tiny per-frame camera jitter it needs to rebuild fine detail. HDRP turns jitter off in VR, which makes DLSS blurry. " +
@@ -267,6 +276,36 @@ namespace VoidCrewVRUIFix
                 MenuBackdropOpacity.Value, CursorScale.Value, DesktopViewOn.Value ? "on" : "off", DesktopView.Value, DesktopViewWidth.Value,
                 DesktopViewHeight.Value, OnOff(MonitorVSyncOffInVr.Value), DisableDlss.Value ? "off" : "allowed", OnOff(DlssCameraJitter.Value),
                 OnOff(ControlFromVrView.Value));
+        }
+
+        /// <summary>
+        /// RESTORE on the VR tab: every setting the VR tab and the Modify UI window show goes back to its default, saved
+        /// in one go. The plugin's other settings (the fixes, debug options and other hotkeys only in the file) are kept.
+        /// </summary>
+        public static void RestoreVrDefaults()
+        {
+            ConfigFile file = Enabled.ConfigFile;
+            bool saveEach = file.SaveOnConfigSet;
+            file.SaveOnConfigSet = false;
+            try
+            {
+                var entries = new ConfigEntryBase[]
+                {
+                    DisplayMode, AimWithHead, MenuBackdropOpacity, CursorScale, DesktopViewOn, KeyDesktopView, DesktopViewWhenHeadsetOff,
+                    DesktopView, DesktopViewWidth, DesktopViewHeight, ShowFpsCounter, MonitorVSyncOffInVr, DisableDlss, DlssCameraJitter,
+                    ControlFromVrView, PanelWidthDegrees, PanelDistance, PanelHeightOffset, Anchor
+                };
+                foreach (ConfigEntryBase entry in entries) entry.BoxedValue = entry.DefaultValue;
+                foreach (LayerPlacement placement in new[] { PlayerHud, ShipStatus, Objectives, TurretCrosshair, TurretReadouts, WeaponStats, FpsPlacement })
+                {
+                    placement.ResetToDefaults();
+                }
+            }
+            finally
+            {
+                file.SaveOnConfigSet = saveEach;
+                file.Save();
+            }
         }
 
         /// <summary>

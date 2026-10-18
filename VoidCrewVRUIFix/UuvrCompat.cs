@@ -87,6 +87,23 @@ namespace VoidCrewVRUIFix
             return true;
         }
 
+        /// <summary>
+        /// Puts the UUVR settings the VR tab shows at this plugin's defaults: OpenVR (SteamVR), which the sharp SteamVR
+        /// overlay needs (UUVR's own default is OpenXR), and, with horizonToo, the horizon not kept level. On the first
+        /// start only the VR system is set; RESTORE on the VR tab sets both. UUVR picks its VR system when it starts VR,
+        /// just after all the plugins have loaded, so on the first start the change applies straight away.
+        /// Returns true if a setting changed.
+        /// </summary>
+        public static bool ApplyDefaults(bool horizonToo)
+        {
+            if (!Installed) return false;
+            bool changed = false;
+            string api = GetSetting("PreferredVrApi");
+            if (api != null && api != "OpenVr") changed |= SetSetting("PreferredVrApi", "OpenVr");
+            if (horizonToo && GetSetting("AlignCameraToHorizon") == "True") changed |= SetSetting("AlignCameraToHorizon", "False");
+            return changed;
+        }
+
         /// <summary>Switches VR on or off the same way UUVR's F3 key does.</summary>
         public static bool ToggleVr()
         {

@@ -17,8 +17,9 @@ namespace VoidCrewVRUIFix
     /// dropdowns), so it looks and sounds exactly like the other tabs. Every row saves straight into this plugin's
     /// config (or UUVR's) and takes effect immediately, so changes can be judged live in the headset.
     /// At the top, a MODIFY UI button opens the Modify UI window (UiEditorWindow), where every movable piece of the VR UI
-    /// is placed. This and that window are the only parts of the plugin that use the game's UI classes directly; if a
-    /// game update changes them, installing the tab fails with one warning and everything else keeps working.
+    /// is placed. The Settings menu's RESTORE button, pressed on this tab, puts all of it back to the defaults.
+    /// This and that window are the only parts of the plugin that use the game's UI classes directly; if a game update
+    /// changes them, installing the tab fails with one warning and everything else keeps working.
     /// </summary>
     internal static class VrSettingsTab
     {
@@ -76,6 +77,36 @@ namespace VoidCrewVRUIFix
             AddHeader(tabs, index);
             AnnounceForLocalisation(panel, root.panel);
             Log.Info("Added the VR tab to the game's Settings menu.");
+        }
+
+        /// <summary>
+        /// The Settings menu's RESTORE button. On the VR tab it asks first, then puts the VR tab and the Modify UI window
+        /// back to their defaults. The game's own restore resets every game setting and key binding but none of the VR
+        /// ones, so it only runs on the game's tabs. Returns true if this handled the click.
+        /// </summary>
+        public static bool TryRestore(MonoBehaviour settingsScreen)
+        {
+            var document = settingsScreen.GetComponent<UIDocument>();
+            VisualElement root = document != null ? document.rootVisualElement : null;
+            VisualElement panel = root != null ? root.Q(PanelName) : null;
+            if (panel == null || !IsShowing(panel)) return false;
+
+            MenuScreenController.Instance.ShowConfirmationPopup("RESTORE VR SETTINGS?",
+                "Puts every setting on the VR tab, the UI screen and every piece in Modify UI back to the defaults. " +
+                "Your other settings and key bindings stay as they are.",
+                () =>
+                {
+                    Settings.RestoreVrDefaults();
+                    UuvrCompat.ApplyDefaults(true);
+                    List<Action> refreshers;
+                    if (Refreshers.TryGetValue(root, out refreshers))
+                    {
+                        foreach (Action refresh in refreshers) refresh();
+                    }
+                    UiEditorWindow.RefreshAll();
+                    Log.Info("VR tab: RESTORE put the VR settings, the UI screen and the Modify UI pieces back to their defaults.");
+                });
+            return true;
         }
 
         /// <summary>Called when a Settings menu opens, so its VR tab shows the current values (changed elsewhere, or by F3).</summary>
@@ -192,12 +223,13 @@ namespace VoidCrewVRUIFix
                     }
                 });
             AddDropdown(rows, refreshers, "VR SYSTEM (NEEDS RESTART)",
-                "Which VR system UUVR uses. OpenVR (SteamVR) is recommended: it lets the UI be shown as a sharp SteamVR overlay. Restart the game after changing this.",
+                "Which VR system UUVR uses. OpenVR (SteamVR, the default) is recommended: it lets the UI be shown as a sharp SteamVR overlay. Restart the game after changing this.",
                 new[] { "OpenXR", "OpenVR (SteamVR)" },
                 () => UuvrCompat.VrApi == "OpenVr" ? 1 : 0,
                 choice => UuvrCompat.SetSetting("PreferredVrApi", choice == 1 ? "OpenVr" : "OpenXr"));
             AddDropdown(rows, refreshers, "UI SHOWN AS",
-                "How menus and the HUD reach your headset. Automatic uses the SteamVR overlay when it can. SteamVR overlay: SteamVR draws the UI on its own floating screen, the sharpest option. " +
+                "How menus and the HUD reach your headset. SteamVR overlay (default): SteamVR draws the UI on its own floating screen, the sharpest option " +
+                "(with OpenXR the UI is drawn into the game image instead). Automatic uses the SteamVR overlay when it can. " +
                 "Drawn into the game image: also works with OpenXR, but is a little softer. F7 switches this too.",
                 new[] { "Automatic (best)", "SteamVR overlay (sharpest)", "Drawn into the game image" },
                 () => (int)Settings.DisplayMode.Value, choice => Settings.DisplayMode.Value = (UiDisplayMode)choice);
@@ -212,7 +244,7 @@ namespace VoidCrewVRUIFix
                 0f, MaxBackdropOpacity, SliderFloatSettingEntryVE.NumberDisplayMode.Percentage, "F0",
                 () => Settings.MenuBackdropOpacity.Value, v => Settings.MenuBackdropOpacity.Value = Mathf.Round(v * 20f) / 20f);
             AddSlider(rows, refreshers, "VR MOUSE POINTER SIZE",
-                "Size of the mouse pointer drawn on the UI screen in VR (default 1.0X).",
+                "Size of the mouse pointer drawn on the UI screen in VR (default " + ((float)Settings.CursorScale.DefaultValue).ToString("0.0") + "X).",
                 0.5f, 4f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
                 () => Settings.CursorScale.Value, v => Settings.CursorScale.Value = Mathf.Round(v * 10f) / 10f);
             AddToggle(rows, refreshers, "KEEP HORIZON LEVEL (UUVR)",
@@ -237,7 +269,8 @@ namespace VoidCrewVRUIFix
                 new[] { "Headset view with UI", "Headset view, no UI", "UI only" },
                 () => (int)Settings.DesktopView.Value, choice => Settings.DesktopView.Value = (DesktopViewMode)choice);
             AddSlider(rows, refreshers, "MONITOR WINDOW VIEW WIDTH",
-                "How much of the headset view the monitor window shows when it shows the headset view with UI (default 90). Lower zooms in; higher shows more around the edges. " +
+                "How much of the headset view the monitor window shows when it shows the headset view with UI (default " + ((float)Settings.DesktopViewWidth.DefaultValue).ToString("0") +
+                "). Lower zooms in; higher shows more around the edges. " +
                 "Set it to the UI screen size to make the UI fill the window.",
                 30f, 170f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
                 () => Settings.DesktopViewWidth.Value, v => Settings.DesktopViewWidth.Value = Mathf.Round(v));
@@ -255,8 +288,8 @@ namespace VoidCrewVRUIFix
                 "SteamVR paces the frames instead. Your own settings come back when VR is turned off (default on).",
                 () => Settings.MonitorVSyncOffInVr.Value, on => Settings.MonitorVSyncOffInVr.Value = on);
             AddToggle(rows, refreshers, "ALLOW DLSS (EXPERIMENTAL, NEEDS RESTART)",
-                "Puts DLSS back in Graphics > Upscaling. DLSS renders the game at a lower resolution and upscales it, which can raise the frame rate on NVIDIA RTX cards. " +
-                "It's experimental in VR. Restart the game after turning this on, then choose DLSS under Graphics > Upscaling.",
+                "Keeps DLSS in Graphics > Upscaling (default on). DLSS renders the game at a lower resolution and upscales it, which can raise the frame rate on NVIDIA RTX cards. " +
+                "It's experimental in VR: choose DLSS under Graphics > Upscaling to use it. Turn this off and restart the game if DLSS causes problems in VR.",
                 () => !Settings.DisableDlss.Value, on => Settings.DisableDlss.Value = !on);
             AddToggle(rows, refreshers, "SHARPER DLSS (CAMERA JITTER)",
                 "Gives DLSS the tiny per-frame camera jitter it needs to rebuild fine detail. HDRP leaves jitter out in VR, which makes DLSS blurry. " +

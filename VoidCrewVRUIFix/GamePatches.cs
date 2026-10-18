@@ -34,6 +34,7 @@ namespace VoidCrewVRUIFix
             Patch(harmony, "CG.Input.MouseCursor", "UpdateCursorGraphic", nameof(HideHardwareCursorGraphic), null, "Windows cursor", applied, skipped);
             Patch(harmony, "UI.Settings.SettingsUIPanel", "OnInitialize", null, nameof(SettingsMenuCreated), "VR settings tab", applied, skipped);
             Patch(harmony, "UI.Settings.SettingsUIPanel", "OnEnter", null, nameof(SettingsMenuOpened), "VR settings tab refresh", applied, skipped);
+            Patch(harmony, "UI.Settings.SettingsUIPanel", "TryRestore", nameof(SettingsRestoreClicked), null, "VR settings tab restore", applied, skipped);
             Patch(harmony, "Gameplay.Terminals.TerminalScreen", "DelayedParentWorldUiPanel", nameof(TerminalScreenEntered), null, "terminal screens", applied, skipped);
             Patch(harmony, "CG.Client.Ship.Modules.Mediators.TerminalModuleMediator", "DelayedParentWorldUiPanel", nameof(ShipTerminalEntered), null,
                 "ship terminal screens", applied, skipped);
@@ -406,6 +407,20 @@ namespace VoidCrewVRUIFix
             }
         }
 
+        /// <summary>RESTORE on the VR tab restores the VR settings instead of the game's (see VrSettingsTab.TryRestore).</summary>
+        private static bool SettingsRestoreClicked(MonoBehaviour __instance)
+        {
+            try
+            {
+                return !RestoreVrSettingsTab(__instance);
+            }
+            catch (Exception e)
+            {
+                Log.Failure("Restoring the VR settings", e);
+                return true;
+            }
+        }
+
         // Kept separate so that if a game update changes the UI classes the tab uses, the failure is caught above.
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void InstallVrSettingsTab(MonoBehaviour settingsScreen)
@@ -417,6 +432,12 @@ namespace VoidCrewVRUIFix
         private static void RefreshVrSettingsTab(MonoBehaviour settingsScreen)
         {
             VrSettingsTab.Refresh(settingsScreen);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool RestoreVrSettingsTab(MonoBehaviour settingsScreen)
+        {
+            return VrSettingsTab.TryRestore(settingsScreen);
         }
 
         private static void HideHardwareCursorGraphic(ref bool showTexture)

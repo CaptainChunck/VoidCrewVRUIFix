@@ -93,6 +93,17 @@ namespace VoidCrewVRUIFix
             }
         }
 
+        /// <summary>The settings were all changed at once (RESTORE on the VR tab): open windows show the new values.</summary>
+        public static void RefreshAll()
+        {
+            foreach (UiEditorWindow window in Windows)
+            {
+                if (!window._open) continue;
+                foreach (Action refresh in window._refreshers) refresh();
+                window.UpdateView();
+            }
+        }
+
         /// <summary>A Settings menu just opened: it starts on its tabs, not on a window left open last time.</summary>
         public static void CloseAll()
         {
@@ -288,13 +299,16 @@ namespace VoidCrewVRUIFix
             string name = piece.Title + " ";
             if (piece.Placement == null)
             {
-                VrSettingsTab.AddSlider(_rows, _refreshers, "SIZE", "How wide the floating UI screen looks, as an angle of your view (default 70). Bigger is easier to read; " +
+                VrSettingsTab.AddSlider(_rows, _refreshers, "SIZE", "How wide the floating UI screen looks, as an angle of your view (default " +
+                    ((float)Settings.PanelWidthDegrees.DefaultValue).ToString("0") + "). Bigger is easier to read; " +
                     "smaller keeps the edges of menus in sight.", 30f, 120f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, VrSettingsTab.Degrees,
                     () => Settings.PanelWidthDegrees.Value, v => Settings.PanelWidthDegrees.Value = Mathf.Round(v), name + "SIZE");
-                VrSettingsTab.AddSlider(_rows, _refreshers, "FORWARDS / BACKWARDS", "How far away the UI screen floats (default 1.5 m). It looks the same size at any distance, " +
+                VrSettingsTab.AddSlider(_rows, _refreshers, "FORWARDS / BACKWARDS", "How far away the UI screen floats (default " +
+                    ((float)Settings.PanelDistance.DefaultValue).ToString("0.0") + " m). It looks the same size at any distance, " +
                     "so this only changes how deep it sits compared with the game world.", 0.5f, 5f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
                     () => Settings.PanelDistance.Value, v => Settings.PanelDistance.Value = Mathf.Round(v * 10f) / 10f, name + "DISTANCE");
-                VrSettingsTab.AddSlider(_rows, _refreshers, "UP / DOWN", "Moves the UI screen up or down, in metres (default 0, centred on your view).",
+                VrSettingsTab.AddSlider(_rows, _refreshers, "UP / DOWN", "Moves the UI screen up or down, in metres (default " +
+                    ((float)Settings.PanelHeightOffset.DefaultValue).ToString("0.00") + " m; 0 is centred on your view).",
                     -1f, 1f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.00 m",
                     () => Settings.PanelHeightOffset.Value, v => Settings.PanelHeightOffset.Value = Mathf.Round(v * 20f) / 20f, name + "HEIGHT");
                 VrSettingsTab.AddToggle(_rows, _refreshers, "FOLLOWS YOUR HEAD", "On: the UI screen stays in front of your eyes wherever you look. Off (default): it stays in " +

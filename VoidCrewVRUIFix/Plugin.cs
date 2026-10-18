@@ -16,7 +16,7 @@ namespace VoidCrewVRUIFix
     {
         public const string Guid = "com.user.voidcrew.vruifix";
         public const string Name = "Void Crew VR UI Fix";
-        public const string Version = "3.13.0";
+        public const string Version = "3.14.0";
 
         private GameObject _runtime;
         private bool _running;
@@ -51,6 +51,11 @@ namespace VoidCrewVRUIFix
                 if (!UuvrCompat.Installed)
                 {
                     Log.Warn("UUVR is not installed, so the game will not run in VR and this plugin will stay idle. Install UUVR for Void Crew with Rai Pal.");
+                }
+                else if (Settings.FirstStart && UuvrCompat.ApplyDefaults(false))
+                {
+                    Log.Info("First start with the plugin: UUVR now uses OpenVR (SteamVR), so the UI is shown as a sharp SteamVR overlay. " +
+                             "Settings > VR > VR system changes it back.");
                 }
             });
 
