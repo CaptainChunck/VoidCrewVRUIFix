@@ -25,8 +25,7 @@ namespace VoidCrewVRUIFix
         private readonly DesktopView _desktop = new DesktopView();
         private readonly FullscreenFill _fill = new FullscreenFill();
         private readonly FpsCounter _fps = new FpsCounter();
-        private readonly HudLayer _hud = new PlayerHudLayer();
-        private readonly HudLayer _turretHud = new TurretHudLayer();
+        private HeadLockedPicture[] _pictures = new HeadLockedPicture[1];
         private readonly CanvasMover _canvases = new CanvasMover();
         private readonly VrViewInput _vrViewInput = new VrViewInput();
         private CursorOverlay _cursor;
@@ -53,8 +52,6 @@ namespace VoidCrewVRUIFix
         public CanvasMover Canvases { get { return _canvases; } }
         public DesktopView Desktop { get { return _desktop; } }
         public FpsCounter Fps { get { return _fps; } }
-        public HudLayer Hud { get { return _hud; } }
-        public HudLayer TurretHud { get { return _turretHud; } }
 
         /// <summary>Whether the game window on the monitor shows the game right now.</summary>
         public bool PictureShown { get { return _pictureShown; } }
@@ -68,9 +65,10 @@ namespace VoidCrewVRUIFix
             Settings.DisableUuvrHelperCameras.SettingChanged += (sender, args) => UuvrCompat.RequestScan();
             SceneManager.sceneLoaded += (scene, mode) => _canvasScanDue = true;
 
-            // Changing a HUD setting shows that HUD for a few seconds, even with the Settings menu open.
-            _hud.PreviewOnChange();
-            _turretHud.PreviewOnChange();
+            // Changing a HUD piece's setting shows it for a few seconds, even with the Settings menu open.
+            HudLayers.Create();
+            foreach (HudLayer layer in HudLayers.All) layer.PreviewOnChange();
+            _pictures = new HeadLockedPicture[1 + HudLayers.All.Length];
             Settings.HideWheelBackdrop.SettingChanged += (sender, args) => { if (!Settings.HideWheelBackdrop.Value) WheelBackdrop.Restore(); };
 
             // Order inside each frame: headset image into the desktop picture, capture the UI, then put the UI on
@@ -83,15 +81,15 @@ namespace VoidCrewVRUIFix
             };
             _capture.AfterCapture = (commands, ui) =>
             {
-                _hud.Extract(commands, ui);
+                // Every piece is copied before any is cut out, so pieces whose rectangles overlap keep their pixels.
+                foreach (HudLayer layer in HudLayers.All) layer.Copy(commands, ui);
+                foreach (HudLayer layer in HudLayers.All) layer.Cut(commands, ui);
                 _fill.Sample(commands, ui);
                 _desktop.Fill = _fill.Current;
                 if (_pictureShown && Settings.DesktopView.Value != DesktopViewMode.HeadsetMirror)
                 {
-                    _desktop.Composite(commands, ui, _hud.Extracting ? _hud.CopyTexture : null, _hud.UvRect);
+                    _desktop.Composite(commands, ui, HudLayers.All);
                 }
-                // After the monitor picture, so the monitor shows the turret's readouts where the game draws them.
-                _turretHud.Extract(commands, ui);
                 if (_display != null) _display.AppendSubmit(commands);
             };
         }
@@ -116,8 +114,7 @@ namespace VoidCrewVRUIFix
             _desktop.Release();
             _fill.Release();
             _fps.Release();
-            _hud.Release();
-            _turretHud.Release();
+            foreach (HudLayer layer in HudLayers.All) layer.Release();
         }
 
         private void Update()
@@ -135,8 +132,9 @@ namespace VoidCrewVRUIFix
 
         private void Tick()
         {
-            // The VR tab can wait for a key press even while VR is off.
+            // The VR tab can wait for a key press, and the Modify UI window be open, even while VR is off.
             HotkeyCapture.Update();
+            UiEditorWindow.TickAll();
 
             bool vrActive = XrState.IsActive;
             if (vrActive != _vrActive)
@@ -174,8 +172,7 @@ namespace VoidCrewVRUIFix
             bool menuOpen = cursorShown && !PingWheel.CursorOnlyForWheel();
             // A terminal's screen is part of the world, so it isn't darkened like a menu.
             _capture.BackdropOpacity = menuOpen && !PanelLayout.OnTerminalScreen ? Settings.MenuBackdropOpacity.Value : 0f;
-            _hud.Update(menuOpen, _fill.Current.a > 0.003f);
-            _turretHud.Update(menuOpen, _fill.Current.a > 0.003f);
+            foreach (HudLayer layer in HudLayers.All) layer.Update(menuOpen, _fill.Current.a > 0.003f);
             HeadAim.Update(true, menuOpen);
             PingWheel.Update();
             WheelBackdrop.Update();
@@ -227,9 +224,7 @@ namespace VoidCrewVRUIFix
                         CameraPosition = _cameraPosition,
                         CameraRotation = _cameraRotation,
                         Fill = _fill.Current,
-                        FpsTexture = _fps.Texture,
-                        Hud = _hud.Picture(),
-                        TurretHud = _turretHud.Picture()
+                        Pictures = Pictures()
                     });
                 }
             }
@@ -237,6 +232,15 @@ namespace VoidCrewVRUIFix
             {
                 Log.Failure("Updating the VR UI panel", e);
             }
+        }
+
+        /// <summary>The frame-rate counter, then every HUD piece, where their settings put them this frame.</summary>
+        private HeadLockedPicture[] Pictures()
+        {
+            _pictures[0] = _fps.Picture();
+            HudLayer[] layers = HudLayers.All;
+            for (int i = 0; i < layers.Length && i + 1 < _pictures.Length; i++) _pictures[i + 1] = layers[i].Picture();
+            return _pictures;
         }
 
         private IEnumerator EndOfFrameLoop()
@@ -284,8 +288,7 @@ namespace VoidCrewVRUIFix
             _pictureForHeadsetOff = false;
             VrPerformance.OnVrStopped();
             PanelLayout.LeaveTerminal();
-            _hud.Stop();
-            _turretHud.Stop();
+            foreach (HudLayer layer in HudLayers.All) layer.Stop();
             HeadAim.Stop();
             PingWheel.Stop();
             WheelBackdrop.Restore();

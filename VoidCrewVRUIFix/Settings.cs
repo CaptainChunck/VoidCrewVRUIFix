@@ -55,6 +55,15 @@ namespace VoidCrewVRUIFix
         public static ConfigEntry<float> TurretHudDistance;
         public static ConfigEntry<float> TurretHudSize;
 
+        // Where each head-locked piece sits (see LayerPlacement); adjusted in the Modify UI window.
+        public static LayerPlacement PlayerHud;
+        public static LayerPlacement ShipStatus;
+        public static LayerPlacement Objectives;
+        public static LayerPlacement TurretReadouts;
+        public static LayerPlacement TurretCrosshair;
+        public static LayerPlacement WeaponStats;
+        public static LayerPlacement FpsPlacement;
+
         public static ConfigEntry<bool> ShowVrCursor;
         public static ConfigEntry<float> CursorScale;
         public static ConfigEntry<bool> HideHardwareCursor;
@@ -130,30 +139,32 @@ namespace VoidCrewVRUIFix
                 "and weapons, tools and 'press E' interactions aim where you look. Your body still turns with the mouse. " +
                 "In a turret, the turret turns to wherever you look and the mouse turns your view. " +
                 "Off: you aim with the mouse only and the crosshair stays in front of the game camera.");
-            HudFollowsHead = config.Bind("Player HUD", "Follows Your Head", true,
-                "Shows the player status HUD (portrait, health, oxygen, temperature) locked to your head, so it stays in view wherever you look. " +
-                "Off: it stays on the UI screen with the rest of the HUD.");
-            HudLeftRight = config.Bind("Player HUD", "Left/Right (degrees)", -20f,
-                new ConfigDescription("Where the HUD sits in your view, left (negative) or right (positive).", new AcceptableValueRange<float>(-45f, 45f)));
-            HudUpDown = config.Bind("Player HUD", "Up/Down (degrees)", -18f,
-                new ConfigDescription("Where the HUD sits in your view, down (negative) or up (positive).", new AcceptableValueRange<float>(-45f, 45f)));
-            HudDistance = config.Bind("Player HUD", "Distance", 1f,
-                new ConfigDescription("How far in front of your eyes the HUD floats, in metres. It is always kept nearer than the UI screen.",
-                    new AcceptableValueRange<float>(0.3f, 3f)));
-            HudSize = config.Bind("Player HUD", "Size", 1f,
-                new ConfigDescription("Size of the HUD: 1 is as big as it looks on the UI screen.", new AcceptableValueRange<float>(0.5f, 2f)));
-            TurretHudFollowsHead = config.Bind("Turret HUD", "Follows Your Head", true,
-                "While you control a turret, shows its readouts (heat or charge, ammo, range, spread and the turret's direction) locked to your head, " +
-                "like the player HUD. Off: they stay on the UI screen with the turret's crosshair.");
-            TurretHudLeftRight = config.Bind("Turret HUD", "Left/Right (degrees)", 0f,
-                new ConfigDescription("Where the turret HUD sits in your view, left (negative) or right (positive).", new AcceptableValueRange<float>(-45f, 45f)));
-            TurretHudUpDown = config.Bind("Turret HUD", "Up/Down (degrees)", -22f,
-                new ConfigDescription("Where the turret HUD sits in your view, down (negative) or up (positive).", new AcceptableValueRange<float>(-45f, 45f)));
-            TurretHudDistance = config.Bind("Turret HUD", "Distance", 1f,
-                new ConfigDescription("How far in front of your eyes the turret HUD floats, in metres. It is always kept nearer than the UI screen; " +
-                    "at the same distance as the player HUD, both sit on the same plane.", new AcceptableValueRange<float>(0.3f, 3f)));
-            TurretHudSize = config.Bind("Turret HUD", "Size", 0.8f,
-                new ConfigDescription("Size of the turret HUD: 1 is as big as it looks on the UI screen.", new AcceptableValueRange<float>(0.5f, 2f)));
+            PlayerHud = BindPlacement(config, "Player HUD", "PLAYER HUD", "the player status HUD (portrait, health, oxygen, temperature, key hints and the class ability)",
+                true, -20f, -18f, 1f, 1f);
+            HudFollowsHead = PlayerHud.FollowsHead;
+            HudLeftRight = PlayerHud.LeftRight;
+            HudUpDown = PlayerHud.UpDown;
+            HudDistance = PlayerHud.Distance;
+            HudSize = PlayerHud.Size;
+            ShipStatus = BindPlacement(config, "Ship Status", "SHIP STATUS", "the ship's status (hull, power, alloys and biomass)",
+                true, -28f, 16f, 1f, 0.8f);
+            Objectives = BindPlacement(config, "Objectives", "OBJECTIVES", "the mission objectives",
+                true, 28f, 14f, 1f, 0.8f);
+            TurretCrosshair = BindPlacement(config, "Turret Crosshair", "TURRET CROSSHAIR",
+                "a turret's crosshair and aiming frame while you control it, with the warnings next to it. With Aim With Your Head, the turret aims through it",
+                true, 0f, 0f, 1f, 1f);
+            TurretReadouts = BindPlacement(config, "Turret HUD", "TURRET AMMO AND RANGE",
+                "a turret's readouts while you control it (heat or charge, ammo, range, spread and the turret's direction)",
+                true, 0f, -22f, 1f, 0.8f);
+            TurretHudFollowsHead = TurretReadouts.FollowsHead;
+            TurretHudLeftRight = TurretReadouts.LeftRight;
+            TurretHudUpDown = TurretReadouts.UpDown;
+            TurretHudDistance = TurretReadouts.Distance;
+            TurretHudSize = TurretReadouts.Size;
+            WeaponStats = BindPlacement(config, "Weapon Stats", "WEAPON STATS", "a turret's weapon stats list while you control it (damage, fire rate, range and its mods)",
+                true, 30f, -8f, 1f, 0.8f);
+            FpsPlacement = BindPlacement(config, "FPS Counter", "FPS COUNTER", "the frame-rate counter (Performance > FPS Counter In Headset turns it on)",
+                null, -15f, 12f, 1f, 1f);
 
             ShowVrCursor = config.Bind("Cursor", "Show VR Cursor", true,
                 "Draws the mouse cursor on the UI panel whenever the game shows a cursor (menus, terminals).");
@@ -256,6 +267,29 @@ namespace VoidCrewVRUIFix
                 MenuBackdropOpacity.Value, CursorScale.Value, DesktopViewOn.Value ? "on" : "off", DesktopView.Value, DesktopViewWidth.Value,
                 DesktopViewHeight.Value, OnOff(MonitorVSyncOffInVr.Value), DisableDlss.Value ? "off" : "allowed", OnOff(DlssCameraJitter.Value),
                 OnOff(ControlFromVrView.Value));
+        }
+
+        /// <summary>
+        /// The settings for one head-locked piece: whether it follows your head (null: always), left/right and up/down in
+        /// degrees, distance in metres and size.
+        /// </summary>
+        private static LayerPlacement BindPlacement(ConfigFile config, string section, string title, string what, bool? followsHead,
+            float leftRight, float upDown, float distance, float size)
+        {
+            ConfigEntry<bool> follows = followsHead.HasValue
+                ? config.Bind(section, "Follows Your Head", followsHead.Value,
+                    "Shows " + what + " locked to your head, so it stays in view wherever you look. Off: it stays on the UI screen.")
+                : null;
+            ConfigEntry<float> across = config.Bind(section, "Left/Right (degrees)", leftRight,
+                new ConfigDescription("Where it sits in your view, left (negative) or right (positive).", new AcceptableValueRange<float>(-60f, 60f)));
+            ConfigEntry<float> up = config.Bind(section, "Up/Down (degrees)", upDown,
+                new ConfigDescription("Where it sits in your view, down (negative) or up (positive).", new AcceptableValueRange<float>(-60f, 60f)));
+            ConfigEntry<float> away = config.Bind(section, "Distance", distance,
+                new ConfigDescription("How far in front of your eyes it floats (forwards and backwards), in metres. It is always kept nearer than the UI screen; " +
+                    "pieces at the same distance sit on the same plane.", new AcceptableValueRange<float>(0.3f, 3f)));
+            ConfigEntry<float> scale = config.Bind(section, "Size", size,
+                new ConfigDescription("Its size: 1 is as big as it looks on the UI screen.", new AcceptableValueRange<float>(0.5f, 2f)));
+            return new LayerPlacement(title, char.ToUpper(what[0]) + what.Substring(1) + ".", follows, across, up, away, scale);
         }
 
         private static string OnOff(bool on)

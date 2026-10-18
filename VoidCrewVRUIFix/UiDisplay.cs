@@ -15,14 +15,11 @@ namespace VoidCrewVRUIFix
         /// <summary>Colour to fill the rest of the view with while a full-screen UI layer shows; alpha 0 = none.</summary>
         public Color Fill;
 
-        /// <summary>The frame-rate counter's picture, shown locked to the head; null when it is turned off.</summary>
-        public Texture FpsTexture;
-
-        /// <summary>The player status HUD, shown locked to the head; its texture is null when it isn't shown.</summary>
-        public HeadLockedPicture Hud;
-
-        /// <summary>The turret's readouts while you control a turret, shown locked to the head.</summary>
-        public HeadLockedPicture TurretHud;
+        /// <summary>
+        /// The pictures locked to the head: the frame-rate counter first, then one per HUD piece (HudLayers.All). A
+        /// picture's texture is null while it isn't shown.
+        /// </summary>
+        public HeadLockedPicture[] Pictures;
     }
 
     /// <summary>A way of showing the captured UI texture in the headset.</summary>

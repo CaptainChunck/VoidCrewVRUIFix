@@ -73,8 +73,9 @@ namespace VoidCrewVRUIFix
                                    ", screen camera '" + (capture.LastScreenCamera != null ? capture.LastScreenCamera.name : "none") +
                                    "', backdrop " + capture.BackdropOpacity.ToString("0.00"));
             Line(report, "Player camera", runtime.MainCamera != null ? Describe(runtime.MainCamera) : "none");
-            Line(report, "Player HUD", runtime.Hud.Describe());
-            Line(report, "Turret HUD", runtime.TurretHud.Describe());
+            foreach (HudLayer layer in HudLayers.All) Line(report, PieceName(layer.Placement), layer.Describe());
+            Line(report, PieceName(Settings.FpsPlacement), (Settings.ShowFpsCounter.Value ? "on" : "off") + " | " + Settings.FpsPlacement.Describe());
+            Line(report, "Modify UI window", UiEditorWindow.AnyOpen ? "open" : "closed");
             Line(report, "Turret aim", TurretAim.Describe());
             Line(report, "Wheels", PingWheel.Describe() + " | dark layer behind wheels " + WheelBackdrop.Describe());
             Line(report, "Aiming", (Settings.AimWithHead.Value ? "with your head" : "with the mouse") + " | aiming with the head now " + HeadAim.Aiming +
@@ -170,6 +171,13 @@ namespace VoidCrewVRUIFix
             Log.Info(report.ToString());
 
             SaveSnapshot(capture.Texture, capture.BackdropOpacity);
+        }
+
+        /// <summary>"PLAYER HUD" as "Player HUD", for the report.</summary>
+        private static string PieceName(LayerPlacement placement)
+        {
+            string name = placement.Title.ToLowerInvariant().Replace("hud", "HUD").Replace("fps", "FPS");
+            return char.ToUpperInvariant(name[0]) + name.Substring(1);
         }
 
         private static void SaveSnapshot(RenderTexture texture, float backdrop)

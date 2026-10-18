@@ -18,9 +18,6 @@ namespace VoidCrewVRUIFix
     {
         private const string OverlayKey = "voidcrew.vruifix.ui";
         private const string FillKey = "voidcrew.vruifix.fill";
-        private const string FpsKey = "voidcrew.vruifix.fps";
-        private const string HudKey = "voidcrew.vruifix.hud";
-        private const string TurretHudKey = "voidcrew.vruifix.turrethud";
 
         // The fill is locked to the head and wide enough to cover the whole view. SteamVR draws overlays at their real
         // depth, so it has to sit behind every part of the UI panel: when it sat just behind the panel's centre, it cut
@@ -40,11 +37,9 @@ namespace VoidCrewVRUIFix
         private static ulong _submitFillHandle;
         private static Texture_t _submitFillTexture;
         private static bool _submitFillActive;
-        private static ulong _submitFpsHandle;
-        private static Texture_t _submitFpsTexture;
-        private static bool _submitFpsActive;
-        // The pictures locked to the head: the player HUD and the turret HUD.
-        private static readonly SubmitSlot[] HeadLockedSlots = new SubmitSlot[2];
+        // The pictures locked to the head (the FPS counter, then the HUD pieces), and the render thread's copy of them.
+        private static SubmitSlot[] HeadLockedSlots = new SubmitSlot[0];
+        private static SubmitSlot[] RenderThreadSlots = new SubmitSlot[0];
         private static uint _submitInitToken;
         private static volatile int _submitError;
         private static volatile string _submitException;
@@ -58,12 +53,7 @@ namespace VoidCrewVRUIFix
         private readonly CVROverlay _overlay;
         private readonly ulong _handle;
         private readonly ulong _fillHandle;
-        private readonly ulong _fpsHandle;
-        private Texture _fpsTexture;
-        private bool _fpsShown;
-        private float _appliedFpsDistance = -1f;
-        private readonly HeadLockedOverlay _hud;
-        private readonly HeadLockedOverlay _turretHud;
+        private readonly HeadLockedOverlay[] _headLocked;
         private readonly RenderTexture _fillTexture;
         private readonly uint _initToken;
         private bool _shown;
@@ -92,12 +82,11 @@ namespace VoidCrewVRUIFix
         private int _reportedError;
         private string _reportedException;
 
-        private SteamVrOverlayDisplay(CVROverlay overlay, ulong handle, ulong fillHandle, ulong fpsHandle, ulong hudHandle, ulong turretHudHandle)
+        private SteamVrOverlayDisplay(CVROverlay overlay, ulong handle, ulong fillHandle, ulong[] headLockedHandles, string[] headLockedLabels)
         {
             _overlay = overlay;
             _handle = handle;
             _fillHandle = fillHandle;
-            _fpsHandle = fpsHandle;
             _initToken = OpenVR.GetInitToken();
 
             Check(_overlay.SetOverlayFlag(handle, VROverlayFlags.IsPremultiplied, true), "SetOverlayFlag(IsPremultiplied)");
@@ -124,23 +113,17 @@ namespace VoidCrewVRUIFix
                 }
             }
 
-            if (fpsHandle != 0)
+            lock (SubmitLock)
             {
-                // The frame-rate counter: drawn above the UI, and flipped like the UI (Unity textures are stored bottom row first).
-                Check(_overlay.SetOverlaySortOrder(fpsHandle, 2), "SetOverlaySortOrder(fps)");
-                var bounds = new VRTextureBounds_t { uMin = 0f, uMax = 1f, vMin = 1f, vMax = 0f };
-                Check(_overlay.SetOverlayTextureBounds(fpsHandle, ref bounds), "SetOverlayTextureBounds(fps)");
-                _overlay.HideOverlay(fpsHandle);
-                lock (SubmitLock)
-                {
-                    _submitFpsHandle = fpsHandle;
-                    _submitFpsTexture = default(Texture_t);
-                    _submitFpsActive = false;
-                }
+                HeadLockedSlots = new SubmitSlot[headLockedHandles.Length];
+                RenderThreadSlots = new SubmitSlot[headLockedHandles.Length];
             }
-
-            if (hudHandle != 0) _hud = new HeadLockedOverlay(this, hudHandle, 0, "hud");
-            if (turretHudHandle != 0) _turretHud = new HeadLockedOverlay(this, turretHudHandle, 1, "turret hud");
+            _headLocked = new HeadLockedOverlay[headLockedHandles.Length];
+            for (int i = 0; i < headLockedHandles.Length; i++)
+            {
+                // The FPS counter (first) above the HUD pieces, and both above the UI.
+                if (headLockedHandles[i] != 0) _headLocked[i] = new HeadLockedOverlay(this, headLockedHandles[i], i, headLockedLabels[i], i == 0 ? 3u : 2u);
+            }
         }
 
         public string Name { get { return "SteamVR overlay"; } }
@@ -213,20 +196,20 @@ namespace VoidCrewVRUIFix
                 if (overlay.CreateOverlay(FillKey, "Void Crew UI background", ref fillHandle) != EVROverlayError.None) fillHandle = 0;
             }
 
-            // Optional third overlay for the frame-rate counter.
-            ulong fpsHandle = 0;
-            if (overlay.FindOverlay(FpsKey, ref fpsHandle) != EVROverlayError.None || fpsHandle == 0)
+            // Optional overlays locked to the head: the frame-rate counter, then one per HUD piece.
+            HudLayer[] layers = HudLayers.All;
+            var handles = new ulong[1 + layers.Length];
+            var labels = new string[1 + layers.Length];
+            handles[0] = FindOrCreate(overlay, HudLayers.FpsOverlayKey, "Void Crew FPS counter");
+            labels[0] = "fps";
+            for (int i = 0; i < layers.Length; i++)
             {
-                fpsHandle = 0;
-                if (overlay.CreateOverlay(FpsKey, "Void Crew FPS counter", ref fpsHandle) != EVROverlayError.None) fpsHandle = 0;
+                handles[i + 1] = FindOrCreate(overlay, HudLayers.OverlayKey(layers[i]), "Void Crew " + layers[i].Placement.Title.ToLowerInvariant());
+                labels[i + 1] = layers[i].Id;
             }
 
-            // Optional overlays for the status HUD and the turret HUD, locked to the head.
-            ulong hudHandle = FindOrCreate(overlay, HudKey, "Void Crew HUD");
-            ulong turretHudHandle = FindOrCreate(overlay, TurretHudKey, "Void Crew turret HUD");
-
             reason = null;
-            return new SteamVrOverlayDisplay(overlay, handle, fillHandle, fpsHandle, hudHandle, turretHudHandle);
+            return new SteamVrOverlayDisplay(overlay, handle, fillHandle, handles, labels);
         }
 
         /// <summary>An optional overlay: the one left from an earlier VR start, or a new one; 0 if SteamVR refuses.</summary>
@@ -288,51 +271,13 @@ namespace VoidCrewVRUIFix
             }
 
             UpdateFill(show ? state.Fill : Color.clear);
-            UpdateFps(show ? state.FpsTexture : null);
-            if (_hud != null) _hud.Update(state.Hud);
-            if (_turretHud != null) _turretHud.Update(state.TurretHud);
+            HeadLockedPicture[] pictures = state.Pictures;
+            for (int i = 0; i < _headLocked.Length; i++)
+            {
+                if (_headLocked[i] == null) continue;
+                _headLocked[i].Update(show && pictures != null && i < pictures.Length ? pictures[i] : default(HeadLockedPicture));
+            }
             ReportRenderThreadProblems();
-        }
-
-        /// <summary>The frame-rate counter: locked to the head, up and to the left, in front of the UI panel.</summary>
-        private void UpdateFps(Texture texture)
-        {
-            if (_fpsHandle == 0) return;
-
-            bool show = texture != null;
-            if (show)
-            {
-                if (!ReferenceEquals(texture, _fpsTexture))
-                {
-                    // Asking for the native pointer waits for the render thread, so only when the texture changes.
-                    _fpsTexture = texture;
-                    IntPtr native = texture.GetNativeTexturePtr();
-                    lock (SubmitLock) _submitFpsTexture = new Texture_t { handle = native, eType = ETextureType.DirectX, eColorSpace = EColorSpace.Auto };
-                }
-
-                float distance = FpsCounter.Distance(PanelLayout.Distance);
-                if (Mathf.Abs(distance - _appliedFpsDistance) > 0.001f)
-                {
-                    var transform = new HmdMatrix34_t
-                    {
-                        m0 = 1f, m5 = 1f, m10 = 1f,
-                        m3 = FpsCounter.OffsetAtOneMetre.x * distance,
-                        m7 = FpsCounter.OffsetAtOneMetre.y * distance,
-                        m11 = -distance
-                    };
-                    Check(_overlay.SetOverlayTransformTrackedDeviceRelative(_fpsHandle, OpenVR.k_unTrackedDeviceIndex_Hmd, ref transform),
-                        "SetOverlayTransformTrackedDeviceRelative(fps)");
-                    Check(_overlay.SetOverlayWidthInMeters(_fpsHandle, FpsCounter.WidthAtOneMetre * distance), "SetOverlayWidthInMeters(fps)");
-                    _appliedFpsDistance = distance;
-                }
-            }
-
-            if (show != _fpsShown)
-            {
-                Check(show ? _overlay.ShowOverlay(_fpsHandle) : _overlay.HideOverlay(_fpsHandle), show ? "ShowOverlay(fps)" : "HideOverlay(fps)");
-                _fpsShown = show;
-                lock (SubmitLock) _submitFpsActive = show;
-            }
         }
 
         private void UpdateFill(Color fill)
@@ -403,13 +348,10 @@ namespace VoidCrewVRUIFix
                 Texture_t fill = _submitFillTexture;
                 _overlay.SetOverlayTexture(_fillHandle, ref fill);
             }
-            if (_fpsShown && _submitFpsTexture.handle != IntPtr.Zero)
+            foreach (HeadLockedOverlay picture in _headLocked)
             {
-                Texture_t fps = _submitFpsTexture;
-                _overlay.SetOverlayTexture(_fpsHandle, ref fps);
+                if (picture != null) picture.SubmitFromMainThread();
             }
-            if (_hud != null) _hud.SubmitFromMainThread();
-            if (_turretHud != null) _turretHud.SubmitFromMainThread();
             Interlocked.Increment(ref _submitCount);
         }
 
@@ -428,11 +370,7 @@ namespace VoidCrewVRUIFix
                 _submitFillHandle = 0;
                 _submitFillTexture = default(Texture_t);
                 _submitFillActive = false;
-                _submitFpsHandle = 0;
-                _submitFpsTexture = default(Texture_t);
-                _submitFpsActive = false;
-                HeadLockedSlots[0] = default(SubmitSlot);
-                HeadLockedSlots[1] = default(SubmitSlot);
+                Array.Clear(HeadLockedSlots, 0, HeadLockedSlots.Length);
             }
 
             // If VR was already turned off, OpenVR is gone and the overlays with it. Calling into it would crash.
@@ -445,13 +383,10 @@ namespace VoidCrewVRUIFix
                     _overlay.HideOverlay(_fillHandle);
                     _overlay.DestroyOverlay(_fillHandle);
                 }
-                if (_fpsHandle != 0)
+                foreach (HeadLockedOverlay picture in _headLocked)
                 {
-                    _overlay.HideOverlay(_fpsHandle);
-                    _overlay.DestroyOverlay(_fpsHandle);
+                    if (picture != null) picture.Destroy();
                 }
-                if (_hud != null) _hud.Destroy();
-                if (_turretHud != null) _turretHud.Destroy();
             }
             if (_fillTexture != null)
             {
@@ -639,11 +574,7 @@ namespace VoidCrewVRUIFix
                 ulong fillHandle;
                 Texture_t fillTexture;
                 bool fillActive;
-                ulong fpsHandle;
-                Texture_t fpsTexture;
-                bool fpsActive;
-                SubmitSlot hud;
-                SubmitSlot turretHud;
+                SubmitSlot[] slots;
                 uint initToken;
                 lock (SubmitLock)
                 {
@@ -653,11 +584,8 @@ namespace VoidCrewVRUIFix
                     fillHandle = _submitFillHandle;
                     fillTexture = _submitFillTexture;
                     fillActive = _submitFillActive;
-                    fpsHandle = _submitFpsHandle;
-                    fpsTexture = _submitFpsTexture;
-                    fpsActive = _submitFpsActive;
-                    hud = HeadLockedSlots[0];
-                    turretHud = HeadLockedSlots[1];
+                    slots = RenderThreadSlots;
+                    Array.Copy(HeadLockedSlots, slots, Math.Min(HeadLockedSlots.Length, slots.Length));
                     initToken = _submitInitToken;
                 }
                 if (overlay == null || handle == 0 || texture.handle == IntPtr.Zero) return;
@@ -671,17 +599,12 @@ namespace VoidCrewVRUIFix
                 {
                     overlay.SetOverlayTexture(fillHandle, ref fillTexture);
                 }
-                if (fpsActive && fpsHandle != 0 && fpsTexture.handle != IntPtr.Zero)
+                for (int i = 0; i < slots.Length; i++)
                 {
-                    overlay.SetOverlayTexture(fpsHandle, ref fpsTexture);
-                }
-                if (hud.Active && hud.Handle != 0 && hud.Texture.handle != IntPtr.Zero)
-                {
-                    overlay.SetOverlayTexture(hud.Handle, ref hud.Texture);
-                }
-                if (turretHud.Active && turretHud.Handle != 0 && turretHud.Texture.handle != IntPtr.Zero)
-                {
-                    overlay.SetOverlayTexture(turretHud.Handle, ref turretHud.Texture);
+                    if (slots[i].Active && slots[i].Handle != 0 && slots[i].Texture.handle != IntPtr.Zero)
+                    {
+                        overlay.SetOverlayTexture(slots[i].Handle, ref slots[i].Texture);
+                    }
                 }
                 Interlocked.Increment(ref _submitCount);
             }
@@ -701,8 +624,8 @@ namespace VoidCrewVRUIFix
         }
 
         /// <summary>
-        /// One picture locked to the head (the player HUD or the turret HUD) on its own overlay: above the UI, below the
-        /// frame-rate counter, and flipped like the UI, since it is a piece of the same picture.
+        /// One picture locked to the head (a HUD piece or the FPS counter) on its own overlay, above the UI. HUD pieces
+        /// are flipped like the UI, since they are pieces of the same picture.
         /// </summary>
         private sealed class HeadLockedOverlay
         {
@@ -720,8 +643,10 @@ namespace VoidCrewVRUIFix
             private Quaternion _appliedRotation;
             private float _appliedWidth = -1f;
             private int _appliedFlip;
+            private float _appliedAlpha = 1f;
+            private readonly string _alphaCall;
 
-            public HeadLockedOverlay(SteamVrOverlayDisplay display, ulong handle, int slot, string label)
+            public HeadLockedOverlay(SteamVrOverlayDisplay display, ulong handle, int slot, string label, uint sortOrder)
             {
                 _display = display;
                 _handle = handle;
@@ -731,9 +656,11 @@ namespace VoidCrewVRUIFix
                 _boundsCall = "SetOverlayTextureBounds(" + label + ")";
                 _showCall = "ShowOverlay(" + label + ")";
                 _hideCall = "HideOverlay(" + label + ")";
+                _alphaCall = "SetOverlayAlpha(" + label + ")";
 
                 CVROverlay overlay = display._overlay;
-                display.Check(overlay.SetOverlaySortOrder(handle, 2), "SetOverlaySortOrder(" + label + ")");
+                display.Check(overlay.SetOverlaySortOrder(handle, sortOrder), "SetOverlaySortOrder(" + label + ")");
+                display.Check(overlay.SetOverlayAlpha(handle, 1f), _alphaCall);
                 var bounds = new VRTextureBounds_t { uMin = 0f, uMax = 1f, vMin = 1f, vMax = 0f };
                 display.Check(overlay.SetOverlayTextureBounds(handle, ref bounds), _boundsCall);
                 overlay.HideOverlay(handle);
@@ -774,12 +701,18 @@ namespace VoidCrewVRUIFix
                         _display.Check(overlay.SetOverlayWidthInMeters(_handle, picture.Size.x), _widthCall);
                         _appliedWidth = picture.Size.x;
                     }
-                    int flip = Settings.FlipVertically.Value ? 1 : 0;
+                    int flip = picture.Flip ? 1 : 0;
                     if (flip != _appliedFlip)
                     {
+                        // Unity textures are stored bottom row first and SteamVR reads top row first, hence the flipped bounds by default.
                         var bounds = new VRTextureBounds_t { uMin = 0f, uMax = 1f, vMin = flip == 1 ? 0f : 1f, vMax = flip == 1 ? 1f : 0f };
                         _display.Check(overlay.SetOverlayTextureBounds(_handle, ref bounds), _boundsCall);
                         _appliedFlip = flip;
+                    }
+                    if (Mathf.Abs(picture.Alpha - _appliedAlpha) > 0.01f)
+                    {
+                        _display.Check(overlay.SetOverlayAlpha(_handle, Mathf.Clamp01(picture.Alpha)), _alphaCall);
+                        _appliedAlpha = picture.Alpha;
                     }
                 }
 

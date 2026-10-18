@@ -79,6 +79,10 @@ namespace VoidCrewVRUIFix
         /// </summary>
         public static Quaternion AimRotation(Camera camera)
         {
+            // A turret's crosshair can be its own piece, locked to the head wherever its settings put it: aim through that.
+            HudLayer crosshair = HudLayers.TurretCrosshair;
+            if (TurretAim.Steering && crosshair != null && crosshair.Extracting) return ViewRotation(camera) * crosshair.Placement.Rotation;
+
             var throughCrosshair = new Vector3(0f, PanelLayout.HeightOffset / PanelLayout.Distance, 1f);
             return ViewRotation(camera) * Quaternion.LookRotation(throughCrosshair);
         }

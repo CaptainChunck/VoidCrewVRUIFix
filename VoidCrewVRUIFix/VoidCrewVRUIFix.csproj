@@ -93,6 +93,10 @@
       <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.UIElementsModule">
       <HintPath>$(GameManaged)\UnityEngine.UIElementsModule.dll</HintPath>
       <Private>False</Private>
@@ -130,6 +134,7 @@
     <Compile Include="HudLayer.cs" />
     <Compile Include="InGamePanelDisplay.cs" />
     <Compile Include="IntroVideo.cs" />
+    <Compile Include="LayerPlacement.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="PanelLayout.cs" />
     <Compile Include="PingWheel.cs" />
@@ -145,6 +150,7 @@
     <Compile Include="TurretAim.cs" />
     <Compile Include="UiCapture.cs" />
     <Compile Include="UiDisplay.cs" />
+    <Compile Include="UiEditor.cs" />
     <Compile Include="UuvrCompat.cs" />
     <Compile Include="VrUiRuntime.cs" />
     <Compile Include="VrSettingsTab.cs" />

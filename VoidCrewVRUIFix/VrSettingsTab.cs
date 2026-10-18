@@ -16,8 +16,9 @@ namespace VoidCrewVRUIFix
     /// Adds a "VR" tab to the game's own Settings menu, built from the game's own setting rows (toggles, sliders and
     /// dropdowns), so it looks and sounds exactly like the other tabs. Every row saves straight into this plugin's
     /// config (or UUVR's) and takes effect immediately, so changes can be judged live in the headset.
-    /// This is the only part of the plugin that uses the game's UI classes directly; if a game update changes them,
-    /// installing the tab fails with one warning and everything else keeps working.
+    /// At the top, a MODIFY UI button opens the Modify UI window (UiEditorWindow), where every movable piece of the VR UI
+    /// is placed. This and that window are the only parts of the plugin that use the game's UI classes directly; if a
+    /// game update changes them, installing the tab fails with one warning and everything else keeps working.
     /// </summary>
     internal static class VrSettingsTab
     {
@@ -27,7 +28,7 @@ namespace VoidCrewVRUIFix
         private const float MaxBackdropOpacity = 0.8f;
 
         /// <summary>Slider number format with a degree sign.</summary>
-        private const string Degrees = "0\u00b0";
+        internal const string Degrees = "0\u00b0";
 
         // One list of row refreshers per Settings menu: the game can create more than one (main menu and in game).
         private static readonly Dictionary<VisualElement, List<Action>> Refreshers = new Dictionary<VisualElement, List<Action>>();
@@ -64,6 +65,9 @@ namespace VoidCrewVRUIFix
             panel.name = PanelName;
             panel.style.display = DisplayStyle.None;
             var refreshers = new List<Action>();
+            // The Modify UI window covers the Settings menu's frame (the tabs and their contents) while it is open.
+            var editor = new UiEditorWindow(tabs.parent ?? root);
+            AddModifyUiButton(rows, editor);
             AddRows(rows, refreshers);
             ForgetClosedMenus();
             Refreshers[root] = refreshers;
@@ -77,6 +81,7 @@ namespace VoidCrewVRUIFix
         /// <summary>Called when a Settings menu opens, so its VR tab shows the current values (changed elsewhere, or by F3).</summary>
         public static void Refresh(MonoBehaviour settingsScreen)
         {
+            UiEditorWindow.CloseAll();
             var document = settingsScreen.GetComponent<UIDocument>();
             List<Action> refreshers;
             if (document == null || document.rootVisualElement == null || !Refreshers.TryGetValue(document.rootVisualElement, out refreshers)) return;
@@ -196,69 +201,11 @@ namespace VoidCrewVRUIFix
                 "Drawn into the game image: also works with OpenXR, but is a little softer. F7 switches this too.",
                 new[] { "Automatic (best)", "SteamVR overlay (sharpest)", "Drawn into the game image" },
                 () => (int)Settings.DisplayMode.Value, choice => Settings.DisplayMode.Value = (UiDisplayMode)choice);
-            AddSlider(rows, refreshers, "UI SCREEN SIZE",
-                "How wide the floating UI screen looks, as an angle of your view (default 70). Bigger is easier to read; smaller keeps the edges of menus in sight.",
-                30f, 120f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
-                () => Settings.PanelWidthDegrees.Value, v => Settings.PanelWidthDegrees.Value = Mathf.Round(v));
-            AddSlider(rows, refreshers, "UI SCREEN DISTANCE",
-                "How far away the UI screen floats (default 1.5 m). It looks the same size at any distance, so this only changes how deep it sits compared with the game world.",
-                0.5f, 5f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
-                () => Settings.PanelDistance.Value, v => Settings.PanelDistance.Value = Mathf.Round(v * 10f) / 10f);
-            AddSlider(rows, refreshers, "UI SCREEN HEIGHT",
-                "Moves the UI screen up or down, in metres. 0 keeps it centred on your view.",
-                -1f, 1f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.00 m",
-                () => Settings.PanelHeightOffset.Value, v => Settings.PanelHeightOffset.Value = Mathf.Round(v * 20f) / 20f);
-            AddToggle(rows, refreshers, "UI SCREEN FOLLOWS YOUR HEAD",
-                "On: the UI screen stays in front of your eyes wherever you look. Off (default): it stays in front of the game camera, so you can look around it, and markers and pings line up with the world.",
-                () => Settings.Anchor.Value == PanelAnchor.Head, on => Settings.Anchor.Value = on ? PanelAnchor.Head : PanelAnchor.GameCamera);
             AddToggle(rows, refreshers, "AIM WITH YOUR HEAD",
                 "On (default): while you play, the crosshair stays in the middle of your view, and your weapons, tools and 'press E' interactions aim where you look. " +
                 "Your body still turns with the mouse. In a turret, the turret turns to wherever you look and the mouse turns your view. " +
                 "Menus and terminals stay put in front of you. Off: you aim with the mouse only.",
                 () => Settings.AimWithHead.Value, on => Settings.AimWithHead.Value = on);
-            const string HudPreview = " The HUD shows in the headset for a few seconds while you change this, so you can see where it goes.";
-            AddToggle(rows, refreshers, "PLAYER HUD FOLLOWS YOUR HEAD",
-                "On (default): the player status HUD (portrait, health, oxygen, temperature) is locked to your head, so it stays in view wherever you look. " +
-                "Off: it stays on the UI screen with the rest of the HUD." + HudPreview,
-                () => Settings.HudFollowsHead.Value, on => Settings.HudFollowsHead.Value = on);
-            AddSlider(rows, refreshers, "PLAYER HUD LEFT / RIGHT",
-                "Moves the player HUD left (negative) or right (positive) in your view, in degrees (default -20)." + HudPreview,
-                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
-                () => Settings.HudLeftRight.Value, v => Settings.HudLeftRight.Value = Mathf.Round(v));
-            AddSlider(rows, refreshers, "PLAYER HUD UP / DOWN",
-                "Moves the player HUD down (negative) or up (positive) in your view, in degrees (default -18)." + HudPreview,
-                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
-                () => Settings.HudUpDown.Value, v => Settings.HudUpDown.Value = Mathf.Round(v));
-            AddSlider(rows, refreshers, "PLAYER HUD DISTANCE",
-                "Moves the player HUD nearer or further away (default 1.0 m). It is always kept nearer than the UI screen, so it is never hidden behind it." + HudPreview,
-                0.3f, 3f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
-                () => Settings.HudDistance.Value, v => Settings.HudDistance.Value = Mathf.Round(v * 10f) / 10f);
-            AddSlider(rows, refreshers, "PLAYER HUD SIZE",
-                "Size of the player HUD (default 1.0X, as big as it looks on the UI screen)." + HudPreview,
-                0.5f, 2f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
-                () => Settings.HudSize.Value, v => Settings.HudSize.Value = Mathf.Round(v * 10f) / 10f);
-            const string TurretPreview = " The turret HUD shows in the headset for a few seconds while you change this (a TURRET box until you have used a turret).";
-            AddToggle(rows, refreshers, "TURRET HUD FOLLOWS YOUR HEAD",
-                "On (default): while you control a turret, its readouts (heat or charge, ammo, range, spread and the turret's direction) are locked to your head, " +
-                "like the player HUD. Off: they stay on the UI screen with the turret's crosshair." + TurretPreview,
-                () => Settings.TurretHudFollowsHead.Value, on => Settings.TurretHudFollowsHead.Value = on);
-            AddSlider(rows, refreshers, "TURRET HUD LEFT / RIGHT",
-                "Moves the turret HUD left (negative) or right (positive) in your view, in degrees (default 0)." + TurretPreview,
-                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
-                () => Settings.TurretHudLeftRight.Value, v => Settings.TurretHudLeftRight.Value = Mathf.Round(v));
-            AddSlider(rows, refreshers, "TURRET HUD UP / DOWN",
-                "Moves the turret HUD down (negative) or up (positive) in your view, in degrees (default -22)." + TurretPreview,
-                -45f, 45f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
-                () => Settings.TurretHudUpDown.Value, v => Settings.TurretHudUpDown.Value = Mathf.Round(v));
-            AddSlider(rows, refreshers, "TURRET HUD DISTANCE",
-                "Moves the turret HUD nearer or further away (default 1.0 m). Set it to the player HUD's distance to put both on the same plane. " +
-                "It is always kept nearer than the UI screen." + TurretPreview,
-                0.3f, 3f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, "0.0 m",
-                () => Settings.TurretHudDistance.Value, v => Settings.TurretHudDistance.Value = Mathf.Round(v * 10f) / 10f);
-            AddSlider(rows, refreshers, "TURRET HUD SIZE",
-                "Size of the turret HUD (default 0.8X; 1.0X is as big as it looks on the UI screen)." + TurretPreview,
-                0.5f, 2f, SliderFloatSettingEntryVE.NumberDisplayMode.Multiplier, "0.0",
-                () => Settings.TurretHudSize.Value, v => Settings.TurretHudSize.Value = Mathf.Round(v * 10f) / 10f);
             AddSlider(rows, refreshers, "DARKEN WORLD BEHIND MENUS",
                 "While a menu or terminal is open, puts a dark layer over the game world behind it, which can make menu text easier to read (default 0%, off). " +
                 "Menus that already darken the screen, like Settings, only get slightly darker.",
@@ -300,7 +247,7 @@ namespace VoidCrewVRUIFix
                 -30f, 30f, SliderFloatSettingEntryVE.NumberDisplayMode.Value, Degrees,
                 () => Settings.DesktopViewHeight.Value, v => Settings.DesktopViewHeight.Value = Mathf.Round(v));
             AddToggle(rows, refreshers, "FPS COUNTER IN HEADSET",
-                "Shows the game's frame rate in the top left of your view in the headset (default off). Green: the headset's full refresh rate. " +
+                "Shows the game's frame rate in your view in the headset (default off; Modify UI places it). Green: the headset's full refresh rate. " +
                 "Yellow: half of it or more, so SteamVR is showing each frame twice. Red: lower than that.",
                 () => Settings.ShowFpsCounter.Value, on => Settings.ShowFpsCounter.Value = on);
             AddToggle(rows, refreshers, "MONITOR V-SYNC OFF IN VR",
@@ -321,14 +268,52 @@ namespace VoidCrewVRUIFix
                 () => Settings.ControlFromVrView.Value, on => Settings.ControlFromVrView.Value = on);
         }
 
-        private static void AddToggle(VisualElement rows, List<Action> refreshers, string label, string help, Func<bool> read, Action<bool> write)
+        /// <summary>The prominent button at the top of the VR tab that opens the Modify UI window.</summary>
+        private static void AddModifyUiButton(VisualElement rows, UiEditorWindow editor)
+        {
+            var block = new VisualElement { name = "VoidCrewVRUIFix_ModifyUi" };
+            block.style.marginTop = 8f;
+            block.style.marginBottom = 18f;
+
+            var button = new Button(editor.Open) { text = "MODIFY UI", name = "VoidCrewVRUIFix_ModifyUiButton" };
+            button.style.height = 72f;
+            button.style.fontSize = 30f;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.unityTextAlign = TextAnchor.MiddleCenter;
+            button.style.color = Color.white;
+            button.style.backgroundColor = new Color(0.12f, 0.42f, 0.6f, 1f);
+            var edge = new Color(0.39f, 0.75f, 0.93f, 1f);
+            button.style.borderLeftWidth = 3f;
+            button.style.borderRightWidth = 3f;
+            button.style.borderTopWidth = 3f;
+            button.style.borderBottomWidth = 3f;
+            button.style.borderLeftColor = edge;
+            button.style.borderRightColor = edge;
+            button.style.borderTopColor = edge;
+            button.style.borderBottomColor = edge;
+            UIAudioProvider.AddSound(button, UIAudioEventRef.ESoundType.Click, "list");
+            UIAudioProvider.AddSound(button, UIAudioEventRef.ESoundType.Hover, "list");
+            block.Add(button);
+
+            var note = new Label("Move, resize and lock to your head every piece of the HUD and the UI screen, with a picture of your view.");
+            note.style.fontSize = 17f;
+            note.style.color = new Color(0.75f, 0.8f, 0.85f, 1f);
+            note.style.whiteSpace = WhiteSpace.Normal;
+            note.style.unityTextAlign = TextAnchor.MiddleCenter;
+            note.style.marginTop = 6f;
+            block.Add(note);
+            rows.Add(block);
+        }
+
+        /// <param name="logName">The name the log uses for the setting (the label if not given).</param>
+        internal static void AddToggle(VisualElement rows, List<Action> refreshers, string label, string help, Func<bool> read, Action<bool> write, string logName = null)
         {
             var row = new BooleanSettingsEntryVE();
             var value = new IntSetting(read() ? 1 : 0, 0, 1, false);
             Prepare(row, label, help);
             row.Init(value);
             ShowToggleState(row, value.Value == 1);
-            value.OnValueChanged += v => Apply(label, v == 1 ? "on" : "off", () => write(v == 1));
+            value.OnValueChanged += v => Apply(logName ?? label, v == 1 ? "on" : "off", () => write(v == 1));
             refreshers.Add(() =>
             {
                 value.SetValue(read() ? 1 : 0, true);
@@ -348,8 +333,9 @@ namespace VoidCrewVRUIFix
             row.EnableInClassList("settings-toggle__false", !on);
         }
 
-        private static void AddSlider(VisualElement rows, List<Action> refreshers, string label, string help, float min, float max,
-            SliderFloatSettingEntryVE.NumberDisplayMode mode, string format, Func<float> read, Action<float> write)
+        /// <param name="logName">The name the log uses for the setting (the label if not given).</param>
+        internal static void AddSlider(VisualElement rows, List<Action> refreshers, string label, string help, float min, float max,
+            SliderFloatSettingEntryVE.NumberDisplayMode mode, string format, Func<float> read, Action<float> write, string logName = null)
         {
             var row = new SliderFloatSettingEntryVE();
             AccessTools.Property(typeof(SliderFloatSettingEntryVE), "DisplayMode")?.SetValue(row, mode, null);
@@ -363,7 +349,7 @@ namespace VoidCrewVRUIFix
             Prepare(row, label, help);
             row.Init(value);
             string logFormat = mode == SliderFloatSettingEntryVE.NumberDisplayMode.Percentage ? "0%" : format;
-            value.OnValueChanged += v => Apply(label, v.ToString(logFormat), () => write(v));
+            value.OnValueChanged += v => Apply(logName ?? label, v.ToString(logFormat), () => write(v));
             refreshers.Add(() =>
             {
                 value.SetValue(Mathf.Clamp(read(), min, max), true);
@@ -416,7 +402,7 @@ namespace VoidCrewVRUIFix
         }
 
         /// <summary>False once the element's menu is closed or another tab is showing.</summary>
-        private static bool IsShowing(VisualElement element)
+        internal static bool IsShowing(VisualElement element)
         {
             if (element.panel == null) return false;
             for (VisualElement e = element; e != null; e = e.hierarchy.parent)

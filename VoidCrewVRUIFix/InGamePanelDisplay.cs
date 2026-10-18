@@ -68,24 +68,7 @@ namespace VoidCrewVRUIFix
                 new Vector3(PanelLayout.WidthMeters, PanelLayout.HeightMeters, 1f));
             _pass.GameCameraToWorld = Matrix4x4.TRS(state.CameraPosition, state.CameraRotation, Vector3.one);
             _pass.Fill = state.Fill;
-            _pass.FpsTexture = state.FpsTexture;
-            _pass.HudTexture = state.Hud.Texture;
-            if (state.Hud.Texture != null) _pass.HudInCamera = InCamera(state.Hud);
-            _pass.TurretHudTexture = state.TurretHud.Texture;
-            if (state.TurretHud.Texture != null) _pass.TurretHudInCamera = InCamera(state.TurretHud);
-            if (state.FpsTexture != null)
-            {
-                float distance = FpsCounter.Distance(PanelLayout.Distance);
-                float width = FpsCounter.WidthAtOneMetre * distance;
-                _pass.FpsInCamera = Matrix4x4.TRS(
-                    new Vector3(FpsCounter.OffsetAtOneMetre.x * distance, FpsCounter.OffsetAtOneMetre.y * distance, distance),
-                    Quaternion.identity, new Vector3(width, width * FpsCounter.Aspect, 1f));
-            }
-        }
-
-        private static Matrix4x4 InCamera(HeadLockedPicture picture)
-        {
-            return Matrix4x4.TRS(picture.Position, picture.Rotation, new Vector3(picture.Size.x, picture.Size.y, 1f));
+            _pass.Pictures = state.Pictures;
         }
 
         public void AppendSubmit(CommandBuffer commands)
@@ -130,12 +113,7 @@ namespace VoidCrewVRUIFix
         public Matrix4x4 PanelInCamera = Matrix4x4.identity;
         public Matrix4x4 GameCameraToWorld = Matrix4x4.identity;
         public Color Fill;
-        public Texture FpsTexture;
-        public Matrix4x4 FpsInCamera = Matrix4x4.identity;
-        public Texture HudTexture;
-        public Matrix4x4 HudInCamera = Matrix4x4.identity;
-        public Texture TurretHudTexture;
-        public Matrix4x4 TurretHudInCamera = Matrix4x4.identity;
+        public HeadLockedPicture[] Pictures;
 
         private const float FillExtraDistance = 0.25f;
         private const float FillHalfAngle = 80f;
@@ -145,9 +123,7 @@ namespace VoidCrewVRUIFix
 
         private Material _material;
         private Material _fillMaterial;
-        private Material _fpsMaterial;
-        private Material _hudMaterial;
-        private Material _turretHudMaterial;
+        private readonly System.Collections.Generic.List<Material> _pictureMaterials = new System.Collections.Generic.List<Material>();
         private Mesh _quad;
         private Mesh _flippedQuad;
 
@@ -156,9 +132,6 @@ namespace VoidCrewVRUIFix
             _material = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Panel");
             _fillMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix Panel Fill");
             _fillMaterial.mainTexture = Texture2D.whiteTexture;
-            _fpsMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix FPS counter");
-            _hudMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix HUD");
-            _turretHudMaterial = RenderUtil.CreateUiMaterial("VoidCrewVRUIFix turret HUD");
             _quad = RenderUtil.CreateQuad(false);
             _flippedQuad = RenderUtil.CreateQuad(true);
         }
@@ -192,25 +165,11 @@ namespace VoidCrewVRUIFix
             _material.mainTexture = Texture;
             ctx.cmd.DrawMesh(FlipVertically ? _flippedQuad : _quad, anchor * PanelInCamera, _material, 0, 0);
 
-            if (HudTexture != null)
+            // The HUD pieces and then the frame-rate counter (first in the list), locked to the head where their settings put them.
+            HeadLockedPicture[] pictures = Pictures;
+            if (pictures != null && pictures.Length > 0)
             {
-                // The status HUD, locked to the head where the HUD settings put it.
-                _hudMaterial.mainTexture = HudTexture;
-                ctx.cmd.DrawMesh(FlipVertically ? _flippedQuad : _quad, head * HudInCamera, _hudMaterial, 0, 0);
-            }
-
-            if (TurretHudTexture != null)
-            {
-                // The turret's readouts, locked to the head where the turret HUD settings put them.
-                _turretHudMaterial.mainTexture = TurretHudTexture;
-                ctx.cmd.DrawMesh(FlipVertically ? _flippedQuad : _quad, head * TurretHudInCamera, _turretHudMaterial, 0, 0);
-            }
-
-            if (FpsTexture != null)
-            {
-                // The frame-rate counter, locked to the head like a SteamVR overlay would be.
-                _fpsMaterial.mainTexture = FpsTexture;
-                ctx.cmd.DrawMesh(_quad, head * FpsInCamera, _fpsMaterial, 0, 0);
+                for (int n = 1; n <= pictures.Length; n++) DrawPicture(ctx.cmd, head, pictures, n % pictures.Length);
             }
             LastDrawnFrame = Time.frameCount;
         }
@@ -219,11 +178,22 @@ namespace VoidCrewVRUIFix
         {
             CoreUtils.Destroy(_material);
             CoreUtils.Destroy(_fillMaterial);
-            CoreUtils.Destroy(_fpsMaterial);
-            CoreUtils.Destroy(_hudMaterial);
-            CoreUtils.Destroy(_turretHudMaterial);
+            foreach (Material material in _pictureMaterials) CoreUtils.Destroy(material);
+            _pictureMaterials.Clear();
             CoreUtils.Destroy(_quad);
             CoreUtils.Destroy(_flippedQuad);
+        }
+
+        private void DrawPicture(CommandBuffer commands, Matrix4x4 head, HeadLockedPicture[] pictures, int index)
+        {
+            HeadLockedPicture picture = pictures[index];
+            if (picture.Texture == null) return;
+            while (_pictureMaterials.Count <= index) _pictureMaterials.Add(RenderUtil.CreateUiMaterial("VoidCrewVRUIFix head-locked picture " + _pictureMaterials.Count));
+            Material material = _pictureMaterials[index];
+            material.mainTexture = picture.Texture;
+            material.color = new Color(1f, 1f, 1f, Mathf.Clamp01(picture.Alpha));
+            commands.DrawMesh(picture.Flip ? _flippedQuad : _quad,
+                head * Matrix4x4.TRS(picture.Position, picture.Rotation, new Vector3(picture.Size.x, picture.Size.y, 1f)), material, 0, 0);
         }
 
         /// <summary>The view and projection of the eye being rendered. HDRP keeps these internal, hence reflection.</summary>

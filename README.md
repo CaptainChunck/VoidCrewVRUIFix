@@ -24,7 +24,7 @@ UUVR turns Void Crew into a VR game, but the game's UI doesn't survive the trip:
 | Turning on DLSS breaks VR | DLSS and FSR3 are removed from the graphics options while UUVR is installed |
 | The intro video doesn't show | The intro video plays on the panel |
 | In a turret, a dark box frames the UI and the turret doesn't shoot where the crosshair is | The dark border is hidden, and the turret turns to wherever you look, with the crosshair in the middle of your view |
-| The turret's readouts (ammo, heat, range, spread) stay on the screen in front of the turret | They follow your head like the player HUD, at a place you choose |
+| HUD pieces stay stuck on the UI screen, out of view when you look around | Each piece (player HUD, ship status, objectives, turret crosshair, turret ammo and range, weapon stats, FPS counter) can follow your head, placed in the Modify UI window |
 | Holding the ping wheel snaps your view and the wheel back, and pings the wrong spot | The wheel stays where you look, and you can look around while it is open: the ping goes to what you look at when you let go |
 | Terminal screens follow your head and slide through the terminal and walls | Terminal screens stay on their terminals, like real screens, and the mouse pointer sits on the screen |
 | Full-screen screens (death screen, spawn screen, fades to black) only cover part of your view | They fill your whole view, with their text on the panel |
@@ -139,11 +139,8 @@ The easiest way to change the VR settings is in the game itself: open **Settings
 | VR on / off (this session) | Turns VR off or back on without restarting, like UUVR's F3 key. The game always starts in VR |
 | VR system (needs restart) | Which VR system UUVR uses. OpenVR (SteamVR) is recommended |
 | UI shown as | Automatic, SteamVR overlay (sharpest) or drawn into the game image (also works with OpenXR) |
-| UI screen size, distance, height | How big the floating UI screen looks, how far away it is, and how high |
-| UI screen follows your head | On: the UI stays in front of your eyes. Off: it stays in front of the game camera, so markers line up with the world |
+| **MODIFY UI** (button at the top) | Opens the Modify UI window: a list of every movable piece of the VR UI, a picture of your view showing where each one sits, and sliders for the chosen piece (see below) |
 | Aim with your head | While you play, the crosshair stays in the middle of your view and weapons, tools and "press E" interactions aim where you look. Your body still turns with the mouse; menus and terminals stay put. In a turret, the turret turns to wherever you look and the mouse turns your view. On by default |
-| Player HUD follows your head, left/right, up/down, distance, size | The player status HUD (portrait, health, oxygen, temperature) stays in view wherever you look, where you put it. The HUD shows in the headset while you change these |
-| Turret HUD follows your head, left/right, up/down, distance, size | While you control a turret, its readouts (heat or charge, ammo, range, spread and the turret's direction) stay in view where you put them. Give it the player HUD's distance to put both on the same plane |
 | Darken world behind menus | Puts a dark layer over the world while a menu or terminal is open, to make text easier to read. Off by default |
 | VR mouse pointer size | Size of the mouse pointer on the UI screen |
 | Keep horizon level (UUVR) | The game only turns you left and right; you look up and down with your head |
@@ -151,11 +148,28 @@ The easiest way to change the VR settings is in the game itself: open **Settings
 | Show game on monitor key | The key for that (F11). Click it, then press the key you want |
 | Show game on monitor when headset is off | While the monitor picture is off, shows it again whenever you take the headset off, and hides it when you put the headset back on |
 | Monitor window shows, view width, view height | What the game window on your monitor shows while you play in VR, how much of the view, and where it is aimed. Set the view width to the UI screen size to make the UI fill the window |
-| FPS counter in headset | Shows the game's frame rate in the top left of your view: green at the headset's full refresh rate, yellow at half, red below |
+| FPS counter in headset | Shows the game's frame rate in your view (Modify UI places it): green at the headset's full refresh rate, yellow at half, red below |
 | Monitor V-Sync off in VR | Your monitor's V-Sync and the game's frame limit are turned off while VR is on, so they can't hold back the headset. On by default |
 | Allow DLSS (experimental, needs restart) | Puts DLSS back in Graphics > Upscaling. See [Frame rate in VR](#frame-rate-in-vr) |
 | Sharper DLSS (camera jitter) | Gives DLSS the camera jitter it needs for a sharp picture. On by default, only used while DLSS runs |
 | Testing: control from SteamVR VR View | Only for testing without a headset (SteamVR's null driver). Leave it off with a real headset |
+
+### The Modify UI window
+
+Click **MODIFY UI** at the top of the VR tab. The window lists the pieces you can place:
+
+| Piece | What it is |
+| --- | --- |
+| UI screen | The floating screen with the menus, markers and the rest of the HUD: size, distance, height, and whether it follows your head |
+| Player HUD | Portrait, health, oxygen, temperature, key hints and the class ability |
+| Ship status | The ship's hull, power, alloys and biomass |
+| Objectives | The mission objectives |
+| Turret crosshair | A turret's crosshair and aiming frame, with the warnings next to it. With Aim with your head, the turret aims through it wherever you put it |
+| Turret ammo and range | A turret's heat or charge, ammo, range, spread and direction |
+| Weapon stats | A turret's weapon stats and mods list |
+| FPS counter | The frame-rate counter |
+
+Choose a piece, then use its sliders: **follows your head**, **left / right** and **up / down** (angles of your view), **forwards / backwards** (distance from your eyes; pieces at the same distance sit on the same plane) and **size**. The picture shows where every piece sits in your view; click a box to choose it. While the window is open, every piece shows in the headset (its last picture, or a labelled box if it hasn't been on screen yet): the chosen one solid, the others see-through, so you can line them up live. **RESET THIS PIECE** puts the chosen piece back to its defaults.
 
 <!-- SCREENSHOT: docs/images/vr-settings-tab.png (the VR tab in the game's Settings menu)
 ![The VR tab in the game's Settings menu](docs/images/vr-settings-tab.png)
@@ -174,8 +188,8 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Height Offset | 0 | Moves the panel up or down, in metres. Not used in the ship's outside cameras or in turrets aimed with the mouse, so the crosshair lines up with the guns |
 | UI Panel → Anchor | GameCamera | `GameCamera` keeps the panel in front of the in-game view, so markers line up and you can look around it. `Head` locks it to your head |
 | Aiming → Aim With Your Head | true | The crosshair stays in the middle of your view while you play, and weapons, tools and interactions aim where you look. In a turret, the turret turns to where you look |
-| Player HUD → Follows Your Head | true | Locks the player status HUD to your head; Left/Right, Up/Down (degrees), Distance (metres) and Size place it |
-| Turret HUD → Follows Your Head | true | Locks a turret's readouts to your head while you control it; Left/Right (0), Up/Down (-22), Distance (1.0) and Size (0.8) place it |
+| Player HUD, Ship Status, Objectives, Turret Crosshair, Turret HUD, Weapon Stats → Follows Your Head | true | Locks that piece to your head; its Left/Right, Up/Down (degrees), Distance (metres) and Size place it. Turret HUD is the turret's ammo and range readouts. The Modify UI window sets all of these |
+| FPS Counter → Left/Right, Up/Down, Distance, Size | -15, 12, 1, 1 | Where the frame-rate counter sits |
 | UI Panel → Menu Backdrop Opacity | 0 | Darkens the world behind menus if text is hard to read against bright scenes (try 0.3). At 1 the world behind menus is completely black |
 | Cursor → Cursor Scale | 1 | Size of the VR cursor |
 | General → UI Display Mode | Auto | `Auto`, `SteamVROverlay` or `InGamePanel` |
@@ -211,7 +225,7 @@ The plugin also does these by itself while you play in VR:
 - Gives DLSS the camera jitter it needs for a sharp picture (HDRP leaves it out in VR).
 - Makes sure HDRP skips the pixels the headset's lenses can't show (the hidden-area mask).
 
-Turn on **FPS counter in headset** in the VR tab to see the frame rate while you play: green means the game keeps up with the headset, yellow means SteamVR is showing each frame twice, red means less often than that.
+Turn on **FPS counter in headset** in the VR tab (or in the Modify UI window, which also places it) to see the frame rate while you play: green means the game keeps up with the headset, yellow means SteamVR is showing each frame twice, red means less often than that.
 
 Press **F9** in game to check: the **Performance** section of the report shows how long the GPU takes per frame, how often SteamVR repeats each frame, whether the monitor's V-Sync is off, whether the hidden-area mask is used, and whether DLSS is running and at what resolution.
 

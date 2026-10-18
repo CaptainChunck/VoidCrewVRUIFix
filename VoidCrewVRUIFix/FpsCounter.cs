@@ -5,17 +5,14 @@ using UnityEngine.XR;
 namespace VoidCrewVRUIFix
 {
     /// <summary>
-    /// A small frame-rate counter for the headset, in the top left of your view: the game's frames per second, green at
-    /// the headset's full refresh rate, yellow at half of it or more, red below that. It is drawn with a tiny built-in
-    /// pixel font (PixelFont) into its own texture, so it needs nothing from the game's UI, and the displays show it
-    /// locked to your view.
+    /// A small frame-rate counter for the headset, by default in the top left of your view (the FPS Counter placement
+    /// settings move it): the game's frames per second, green at the headset's full refresh rate, yellow at half of it
+    /// or more, red below that. It is drawn with a tiny built-in pixel font (PixelFont) into its own texture, so it needs
+    /// nothing from the game's UI, and the displays show it locked to your view.
     /// </summary>
     internal sealed class FpsCounter
     {
-        /// <summary>Position relative to your eyes, for a counter one metre away: up and to the left.</summary>
-        public static readonly Vector2 OffsetAtOneMetre = new Vector2(-0.27f, 0.21f);
-
-        /// <summary>Width of the counter one metre away.</summary>
+        /// <summary>Width of the counter one metre away, at size 1.</summary>
         public const float WidthAtOneMetre = 0.13f;
 
         private const float RefreshInterval = 0.5f;
@@ -51,10 +48,15 @@ namespace VoidCrewVRUIFix
         /// <summary>The last frame rate shown, for the diagnostics report.</summary>
         public int LastFps { get; private set; }
 
-        /// <summary>How far in front of your eyes: one metre, or nearer than a close UI screen so it is never behind it.</summary>
-        public static float Distance(float panelDistance)
+        /// <summary>The counter where its placement settings put it, locked to the head; its texture is null while it is off.</summary>
+        public HeadLockedPicture Picture()
         {
-            return Mathf.Min(1f, 0.8f * panelDistance);
+            LayerPlacement placement = Settings.FpsPlacement;
+            var picture = new HeadLockedPicture { Texture = Texture, Alpha = placement.Alpha };
+            placement.Place(out picture.Position, out picture.Rotation);
+            float width = WidthAtOneMetre * placement.EffectiveDistance() * placement.Scale;
+            picture.Size = new Vector2(width, width * Aspect);
+            return picture;
         }
 
         /// <summary>Once per frame while VR is on.</summary>
