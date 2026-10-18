@@ -64,6 +64,9 @@ namespace VoidCrewVRUIFix
         public static LayerPlacement TurretReadouts;
         public static LayerPlacement TurretCrosshair;
         public static LayerPlacement WeaponStats;
+        public static LayerPlacement Crew;
+        public static LayerPlacement HubMission;
+        public static LayerPlacement GamePrivacy;
         public static LayerPlacement FpsPlacement;
 
         public static ConfigEntry<bool> ShowVrCursor;
@@ -178,6 +181,13 @@ namespace VoidCrewVRUIFix
             TurretHudSize = TurretReadouts.Size;
             WeaponStats = BindPlacement(config, "Weapon Stats", "WEAPON STATS", "a turret's weapon stats list while you control it (damage, fire rate, range and its mods)",
                 true, 17f, 5f, 0.5f, 1.9f);
+            Crew = BindPlacement(config, "Crew", "CREW", "your crewmates' names, levels, classes and health (the crew list)",
+                true, -26f, -2f, 0.6f, 1.5f);
+            HubMission = BindPlacement(config, "Hub Mission", "HUB MISSION AND SHIP",
+                "the hub's mission and ship panel (the chosen mission and ship, and the countdown when a mission starts)",
+                true, 0f, 17f, 0.6f, 1.3f);
+            GamePrivacy = BindPlacement(config, "Game Privacy", "PUBLIC OR PRIVATE GAME", "the hub's sign that says whether your game is public or private",
+                true, 24f, 16f, 0.6f, 1.5f);
             FpsPlacement = BindPlacement(config, "FPS Counter", "FPS COUNTER", "the frame-rate counter (Performance > FPS Counter In Headset turns it on)",
                 null, -17f, 15f, 0.6f, 1.2f);
 
@@ -302,7 +312,10 @@ namespace VoidCrewVRUIFix
                     ControlFromVrView, PanelWidthDegrees, PanelDistance, PanelHeightOffset, Anchor
                 };
                 foreach (ConfigEntryBase entry in entries) entry.BoxedValue = entry.DefaultValue;
-                foreach (LayerPlacement placement in new[] { PlayerHud, ShipStatus, Objectives, TurretCrosshair, TurretReadouts, WeaponStats, FpsPlacement })
+                foreach (LayerPlacement placement in new[]
+                         {
+                             PlayerHud, ShipStatus, Objectives, TurretCrosshair, TurretReadouts, WeaponStats, Crew, HubMission, GamePrivacy, FpsPlacement
+                         })
                 {
                     placement.ResetToDefaults();
                 }

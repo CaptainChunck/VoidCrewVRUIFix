@@ -7,7 +7,7 @@ Makes **Void Crew**'s menus and HUD work properly in VR when you play it with [U
 ## What it does
 
 - **One sharp UI screen.** All menus and the HUD on one clear screen in front of you, drawn by SteamVR as an overlay, with a mouse cursor. No more ghost copies, smeared markers or doubled UI.
-- **Your HUD, where you want it.** The player status, ship status, objectives, turret crosshair, turret ammo and range, weapon stats and an FPS counter can each follow your head. Place them in the **Modify UI** window, which shows a picture of your view.
+- **Your HUD, where you want it.** The player status, ship status, objectives, crew list, turret crosshair, turret ammo and range, weapon stats, the hub's mission panel and public or private sign, and an FPS counter can each follow your head. Place them in the **Modify UI** window, which shows a picture of your view.
 - **Aim with your head.** Weapons, tools, "press E" interactions and pings go where you look, while your body still turns with the mouse. Turrets turn to wherever you look.
 - **Terminals that work.** Terminal screens stay on their terminals, and the mouse pointer sits on the screen, on the button it points at.
 - **Markers that line up.** Pings, objective markers and prompts sit over the objects they belong to.

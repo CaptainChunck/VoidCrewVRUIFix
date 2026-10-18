@@ -1,6 +1,6 @@
 {
     "name": "Void_Crew_VR_UI_Fix",
-    "version_number": "3.14.1",
+    "version_number": "3.15.0",
     "website_url": "https://github.com/CaptainChunck/VoidCrewVRUIFix",
     "description": "Makes Void Crew's menus and HUD work in VR with UUVR (installed with Rai Pal): a sharp UI screen, head-locked HUD pieces you place yourself, aiming where you look, working terminals and pings, and a VR settings tab.",
     "dependencies": [

@@ -667,6 +667,9 @@ namespace VoidCrewVRUIFix
         public static HudLayer TurretCrosshair { get; private set; }
         public static HudLayer TurretReadouts { get; private set; }
         public static HudLayer WeaponStats { get; private set; }
+        public static HudLayer Crew { get; private set; }
+        public static HudLayer HubMission { get; private set; }
+        public static HudLayer GamePrivacy { get; private set; }
         public static HudLayer[] All { get; private set; } = new HudLayer[0];
 
         /// <summary>The SteamVR overlay key of the FPS counter, which is shown with the pieces.</summary>
@@ -701,7 +704,15 @@ namespace VoidCrewVRUIFix
                 Vector2.zero);
             WeaponStats = new UiToolkitHudLayer("weaponstats", Settings.WeaponStats, "STATS", new Vector2(0.15f, 0.3f),
                 new UiToolkitSource("UI.PilotHUD.WeaponHUD", "ModifierContainer"));
-            All = new[] { PlayerHud, ShipStatus, Objectives, TurretCrosshair, TurretReadouts, WeaponStats };
+            // The crew list: one entry per crewmate (name, level, class, health), added as they join.
+            Crew = new UiToolkitHudLayer("crew", Settings.Crew, "CREW", new Vector2(0.12f, 0.12f),
+                new UiToolkitSource("UI.MainHUD.CoopBuddiesPanel", "CoopBuddiesContainer"));
+            // Hub only. The game slides the mission panel off the screen when it isn't needed; then nothing is copied.
+            HubMission = new UiToolkitHudLayer("hubmission", Settings.HubMission, "MISSION", new Vector2(0.18f, 0.07f),
+                new UiToolkitSource("HUBFlowDisplay", "HubFlowPanel"));
+            GamePrivacy = new UiToolkitHudLayer("privacy", Settings.GamePrivacy, "PUBLIC", new Vector2(0.07f, 0.025f),
+                new UiToolkitSource("HUBFlowDisplay", "PrivacyDisplay"));
+            All = new[] { PlayerHud, ShipStatus, Objectives, TurretCrosshair, TurretReadouts, WeaponStats, Crew, HubMission, GamePrivacy };
         }
 
         /// <summary>The SteamVR overlay key for a piece; the player HUD and turret HUD keep the keys earlier versions used.</summary>

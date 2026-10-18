@@ -233,6 +233,13 @@ internal static class Program
         Mono.Cecil.TypeDefinition weaponHud = module.GetType("UI.PilotHUD.WeaponHUD");
         Check(weaponHud != null && DerivesFromMonoBehaviour(weaponHud) && HasField(weaponHud, "Doc", "UnityEngine.UIElements.UIDocument") && UsesString(weaponHud, "ModifierContainer"),
             "UI.PilotHUD.WeaponHUD has its Doc and looks up ModifierContainer (the weapon stats piece)");
+        Mono.Cecil.TypeDefinition crew = module.GetType("UI.MainHUD.CoopBuddiesPanel");
+        Check(crew != null && DerivesFromMonoBehaviour(crew) && UsesString(crew, "CoopBuddiesContainer"),
+            "UI.MainHUD.CoopBuddiesPanel looks up CoopBuddiesContainer (the crew piece)");
+        Mono.Cecil.TypeDefinition hubFlow = module.GetType("HUBFlowDisplay");
+        Check(hubFlow != null && DerivesFromMonoBehaviour(hubFlow) && HasField(hubFlow, "Doc", "UnityEngine.UIElements.UIDocument") &&
+              UsesString(hubFlow, "HubFlowPanel") && UsesString(hubFlow, "PrivacyDisplay"),
+            "HUBFlowDisplay has its Doc and looks up HubFlowPanel and PrivacyDisplay (the hub mission and public or private game pieces)");
 
         // Head aim: each method is patched by name, so it must exist exactly once.
         CheckSingleMethod(module, "CG.Client.Player.Interactions.RaycastHandler", "FindInteractable");

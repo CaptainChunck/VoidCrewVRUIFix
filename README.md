@@ -27,7 +27,7 @@ UUVR injects VR into Void Crew, but this compleatly brakes the UI in VR & deskto
 | Turning on DLSS or FSR3 breaks VR | DLSS works in VR (experimental): it only runs on the player camera, with the fixes it needs. FSR3, which isn't built for VR, is removed from the graphics options |
 | The intro video doesn't show | The intro video plays on the panel |
 | In a turret, a dark box frames the UI and the turret doesn't shoot where the crosshair is | The dark border is hidden, and the turret turns to wherever you look, with the crosshair in the middle of your view |
-| HUD pieces stay stuck on the UI screen, out of view when you look around | Each piece (player HUD, ship status, objectives, turret crosshair, turret ammo and range, weapon stats, FPS counter) can follow your head, placed in the Modify UI window |
+| HUD pieces stay stuck on the UI screen, out of view when you look around | Each piece (player HUD, ship status, objectives, crew list, turret crosshair, turret ammo and range, weapon stats, the hub's mission panel and public or private sign, FPS counter) can follow your head, placed in the Modify UI window |
 | Holding the ping wheel snaps your view and the wheel back, and pings the wrong spot | The wheel stays where you look, and you can look around while it is open: the ping goes to what you look at when you let go |
 | Terminal screens follow your head and slide through the terminal and walls | Terminal screens stay on their terminals, like real screens, and the mouse pointer sits on the screen, on the button it points at even when you turn your head |
 | Full-screen screens (death screen, spawn screen, fades to black) only cover part of your view | They fill your whole view, with their text on the panel |
@@ -170,6 +170,9 @@ Click **MODIFY UI** at the top of the VR tab. The window lists the pieces you ca
 | Turret crosshair | A turret's crosshair and aiming frame, with the warnings next to it. With Aim with your head, the turret aims through it wherever you put it |
 | Turret ammo and range | A turret's heat or charge, ammo, range, spread and direction |
 | Weapon stats | A turret's weapon stats and mods list |
+| Crew | Your crewmates' names, levels, classes and health |
+| Hub mission and ship | In the hub: the chosen mission and ship, and the countdown when a mission starts |
+| Public or private game | In the hub: the sign that says whether your game is public or private |
 | FPS counter | The frame-rate counter |
 
 Choose a piece, then use its sliders: **follows your head**, **left / right** and **up / down** (angles of your view), **forwards / backwards** (distance from your eyes; pieces at the same distance sit on the same plane) and **size**. The picture shows where every piece sits in your view; click a box to choose it. While the window is open, every piece shows in the headset (its last picture, or a labelled box if it hasn't been on screen yet): the chosen one solid, the others see-through, so you can line them up live. **RESET THIS PIECE** puts the chosen piece back to its defaults, and **RESTORE** on the VR tab puts them all back.
@@ -185,6 +188,9 @@ Where the pieces sit by default (left/right and up/down are angles of your view)
 | Turret crosshair | middle | 1° up | 0.6 m | 2.0x |
 | Turret ammo and range | middle | 13° down | 0.6 m | 1.7x |
 | Weapon stats | 17° right | 5° up | 0.5 m | 1.9x |
+| Crew | 26° left | 2° down | 0.6 m | 1.5x |
+| Hub mission and ship | middle | 17° up | 0.6 m | 1.3x |
+| Public or private game | 24° right | 16° up | 0.6 m | 1.5x |
 | FPS counter | 17° left | 15° up | 0.6 m | 1.2x |
 
 <!-- SCREENSHOT: docs/images/vr-settings-tab.png (the VR tab in the game's Settings menu)
@@ -205,7 +211,7 @@ Edit it with any text editor while the game is closed, or change settings live w
 | UI Panel → Anchor | GameCamera | `GameCamera` keeps the panel in front of the in-game view, so markers line up and you can look around it. `Head` locks it to your head |
 | UI Panel → Moves With Your Head Position | true | SteamVR overlay only. UUVR draws the world with your head's turning but not its movement, so the world moves along when you lean or turn your head. The panel moves along too, so the mouse pointer stays on the button it points at (most noticeable on terminal screens). `false` leaves the panel where it was centred in the room |
 | Aiming → Aim With Your Head | true | The crosshair stays in the middle of your view while you play, and weapons, tools and interactions aim where you look. In a turret, the turret turns to where you look |
-| Player HUD, Ship Status, Objectives, Turret Crosshair, Turret HUD, Weapon Stats → Follows Your Head | true | Locks that piece to your head; its Left/Right, Up/Down (degrees), Distance (metres) and Size place it (defaults in [The Modify UI window](#the-modify-ui-window)). Turret HUD is the turret's ammo and range readouts. The Modify UI window sets all of these |
+| Player HUD, Ship Status, Objectives, Turret Crosshair, Turret HUD, Weapon Stats, Crew, Hub Mission, Game Privacy → Follows Your Head | true | Locks that piece to your head; its Left/Right, Up/Down (degrees), Distance (metres) and Size place it (defaults in [The Modify UI window](#the-modify-ui-window)). Turret HUD is the turret's ammo and range readouts. The Modify UI window sets all of these |
 | FPS Counter → Left/Right, Up/Down, Distance, Size | -17, 15, 0.6, 1.2 | Where the frame-rate counter sits |
 | UI Panel → Menu Backdrop Opacity | 0 | Darkens the world behind menus if text is hard to read against bright scenes (try 0.3). At 1 the world behind menus is completely black |
 | Cursor → Cursor Scale | 1.8 | Size of the VR cursor |

@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.15.0 (2026-10-18)
+- Three more pieces in the **Modify UI** window, each able to follow your head where you place it: the crew list (your crewmates' names, levels, classes and health), the hub's mission and ship panel, and the hub's public or private game sign.
+- The labelled boxes Modify UI shows for pieces that aren't on screen yet now show their whole name.
+
 ## 3.14.1 (2026-10-18)
 - Terminals: the mouse pointer stays on the button it points at when you turn or move your head. The SteamVR overlay now moves with your head's position, like the game world does.
 - The UI screen's direction is measured while your head is still, so it lines up with the world exactly.
