@@ -4,9 +4,9 @@
 
 A [BepInEx](https://github.com/BepInEx/BepInEx) plugin that makes **Void Crew**'s menus and HUD work properly in VR when you play it with [UUVR](https://github.com/Raicuparta/uuvr), installed through [Rai Pal](https://github.com/Raicuparta/rai-pal).
 
-UUVR injects VR into Void Crew, but this compleatly brakes the UI in VR & desktoo view aswell as,crashes with dlss enabled: menus leave ghost copies behind, markers smear across the screen, there's no mouse cursor, and the desktop window goes black. This plugin fixes that. It's a single DLL that sits next to UUVR, and you don't need to change any UUVR settings.
+UUVR injects VR into Void Crew, but this completely breaks the UI in VR and in the desktop view, and the game crashes with DLSS enabled: menus leave ghost copies behind, markers smear across the screen, there's no mouse cursor, and the desktop window goes black. This plugin fixes that. It's a single DLL that sits next to UUVR, and you don't need to change any UUVR settings.
 
-> **Status: beta.** Tested with SteamVR on an HTC VIVE Pro 2, Nvidia RTX 3050. Please [report problems](#reporting-a-problem).
+> **Status: beta.** Tested with SteamVR on an HTC VIVE Pro 2 and an NVIDIA RTX 3050. Please [report problems](#reporting-a-problem).
 
 **Download:** [`VoidCrewVRUIFix.dll` from the latest release](../../releases/latest) (see [Installation](#installation)). What's new: [CHANGELOG.md](CHANGELOG.md).
 
@@ -18,7 +18,7 @@ UUVR injects VR into Void Crew, but this compleatly brakes the UI in VR & deskto
 
 | Problem with UUVR alone | With this plugin |
 | --- | --- |
-| Closed menus stay on screen as "ghosts"; markers, pings and prompts leave trails | The UI is working corrctly with the ability to customise UI element positions |
+| Closed menus stay on screen as "ghosts"; markers, pings and prompts leave trails | The UI works correctly, and you can customise where each UI element sits |
 | No mouse cursor in VR | A cursor is shown on the panel whenever the game wants one |
 | The game window on your monitor is black | The game window shows what the headset sees, with the UI on top, so you can play from it |
 | The player status HUD sits in a corner of the UI screen, out of view when you look around | It follows your head, at a place you choose |
